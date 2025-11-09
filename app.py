@@ -18,6 +18,12 @@ SMTP_PORT = int(st.secrets.get("SMTP_PORT", "465"))
 SMTP_USER = st.secrets.get("SMTP_USER", "noreply@example.com") # 발신 이메일
 SMTP_PASS = st.secrets.get("SMTP_PASS", "your_smtp_password") # 발신 이메일 비밀번호
 POPULAR_BONUS_SCORE = 1 # 인기 메뉴에 부여할 가산점
+TAG_BONUS_SCORE = 5 # 선택 태그 일치 메뉴에 부여할 가산점
+
+# 스탬프/리워드 시스템 설정
+AMERICANO_PRICE = 4000 # 아메리카노 기준 가격
+STAMP_REWARD_AMOUNT = AMERICANO_PRICE # 스탬프 10개 달성 시 지급할 쿠폰 금액
+STAMP_GOAL = 10 # 아메리카노 리워드 목표 스탬프 수
 
 # ---------------- 디자인 테마 적용 ----------------
 def set_custom_style():
@@ -143,6 +149,7 @@ def normalize_str(s): return re.sub(r"\s+"," ",str(s).strip()) if pd.notna(s) el
 def send_order_email(to_emails, shop_name, order_id, items, total, note):
     """주문 완료 시 사장님에게 알림 이메일을 전송합니다."""
     if not SMTP_USER or not SMTP_PASS:
+        # 이메일 전송 기능이 비활성화되었더라도 주문 처리는 계속 진행해야 함
         return False, "SMTP 계정 정보가 설정되지 않아 이메일을 보낼 수 없습니다."
 
     msg_lines = [
@@ -171,6 +178,7 @@ def send_order_email(to_emails, shop_name, order_id, items, total, note):
         return True, ""
     except Exception as e:
         st.error(f"이메일 전송 오류: {e}")
+        # st.error(f"이메일 전송 오류: {e}") # 사용자에게 에러 메시지 노출 방지
         return False, str(e)
 
 # ---------------- 메뉴 로드 ----------------
@@ -236,6 +244,7 @@ if "cart" not in st.session_state: st.session_state.cart = []
 if "reco_results" not in st.session_state: st.session_state.reco_results = []
 if "is_reco_fallback" not in st.session_state: st.session_state.is_reco_fallback = False
 # 임시 사용자 데이터베이스: key는 '폰뒷4자리', value는 {pass:비밀번호, coupon:쿠폰액}
+# 임시 사용자 데이터베이스: key는 '폰뒷4자리', value는 {pass:비밀번호, coupon:쿠폰액, stamps:스탬프 수, orders:주문내역}
 if "users_db" not in st.session_state: st.session_state.users_db = {} 
 
 # ---------------- 로그인 페이지 ----------------
@@ -261,11 +270,20 @@ def show_login_page():
             if phone_suffix in st.session_state.users_db:
                 # 기존 사용자 로그인
                 if st.session_state.users_db[phone_suffix]["pass"] == password:
+                user_data = st.session_state.users_db[phone_suffix]
+                if user_data["pass"] == password:
+                    # 누락된 키 초기화 (기존 세션을 위한 대비)
+                    user_data.setdefault("stamps", 0)
+                    user_data.setdefault("orders", [])
+
                     st.session_state.logged_in = True
                     st.session_state.user = {
                         "name": f"고객({phone_suffix})",
                         "phone": phone_suffix,
                         "coupon": st.session_state.users_db[phone_suffix]["coupon"]
+                        "coupon": user_data["coupon"],
+                        "stamps": user_data["stamps"], # 스탬프 추가
+                        "orders": user_data["orders"] # 주문 내역 추가
                     }
                     st.success(f"{st.session_state.user['name']}님, 로그인되었습니다.")
                     st.rerun()
@@ -276,12 +294,18 @@ def show_login_page():
                 st.session_state.users_db[phone_suffix] = {
                     "pass": password,
                     "coupon": WELCOME_COUPON_AMOUNT
+                    "coupon": WELCOME_COUPON_AMOUNT,
+                    "stamps": 0, # 스탬프 초기화
+                    "orders": [] # 주문 내역 초기화
                 }
                 st.session_state.logged_in = True
                 st.session_state.user = {
                     "name": f"고객({phone_suffix})",
                     "phone": phone_suffix,
                     "coupon": WELCOME_COUPON_AMOUNT
+                    "coupon": WELCOME_COUPON_AMOUNT,
+                    "stamps": 0, # 스탬프 초기화
+                    "orders": [] # 주문 내역 초기화
                 }
                 st.success(f"회원가입이 완료되었으며, {money(WELCOME_COUPON_AMOUNT)} 쿠폰이 지급되었습니다!")
                 st.balloons()
@@ -305,10 +329,12 @@ def find_combinations(drinks_df, bakery_df, n_people, n_bakery, max_budget):
     # 성능 최적화를 위해 상위 항목만 사용
     drinks_to_use = drinks_df.head(10).to_dict("records")
     # 베이커리는 인기 메뉴 우선순위를 위해 스코어 기준으로 상위 15개 사용
+    # 베이커리는 (이미 score가 반영된) 스코어 기준으로 상위 15개 사용
     bakery_to_use = bakery_df.sort_values(by="score", ascending=False).head(15).to_dict("records")
 
     for d in drinks_to_use:
         # 음료 스코어는 기본 1
+        # 음료 스코어는 기본 1 (이 부분은 변경 없음)
         d_score = d.get("score", 1) 
 
         combos = itertools.combinations(bakery_to_use, n_bakery) if n_bakery > 0 else [[]]
@@ -318,6 +344,7 @@ def find_combinations(drinks_df, bakery_df, n_people, n_bakery, max_budget):
 
             if total_price <= max_budget:
                 # 총 스코어 계산 (음료 스코어 + 베이커리 스코어 합산)
+                # 총 스코어 계산 (음료 스코어 + (인기+취향 가산점이 이미 반영된) 베이커리 스코어 합산)
                 total_score = d_score + sum(b["score"] for b in b_combo)
 
                 found_results.append({
@@ -327,6 +354,54 @@ def find_combinations(drinks_df, bakery_df, n_people, n_bakery, max_budget):
                     "score": total_score
                 })
     return found_results
+
+# ---------------- 주문 완료 처리 ----------------
+def process_order_completion(phone_suffix, order_id, df_cart, total, final_total, use_coupon):
+    """주문 완료 후 스탬프 적립, 주문 내역 저장 및 쿠폰 발행을 처리합니다."""
+    
+    # 1. 주문 내역 저장
+    order_history_item = {
+        "id": order_id,
+        "date": now_ts(),
+        "items": df_cart[["name", "qty", "unit_price"]].to_dict("records"),
+        "total": int(total),
+        "final_total": int(final_total),
+        "coupon_used": st.session_state.user.get('coupon', 0) if use_coupon else 0,
+        "stamps_earned": 1 
+    }
+    # users_db와 session_state.user에 모두 저장
+    st.session_state.users_db[phone_suffix]['orders'].insert(0, order_history_item) # 최신순으로
+    st.session_state.user['orders'] = st.session_state.users_db[phone_suffix]['orders']
+
+    # 2. 쿠폰 사용 처리
+    if use_coupon:
+        st.session_state.user['coupon'] = 0
+        st.session_state.users_db[phone_suffix]['coupon'] = 0
+
+    # 3. 스탬프 적립
+    st.session_state.user['stamps'] += 1
+    st.session_state.users_db[phone_suffix]['stamps'] += 1
+    
+    st.toast(f"주문이 완료되어 스탬프 1개가 적립되었습니다! ❤️", icon="🎉")
+
+    # 4. 스탬프 목표 달성 확인 및 리워드 지급
+    current_stamps = st.session_state.user['stamps']
+    
+    if current_stamps >= STAMP_GOAL:
+        # 리워드 지급
+        st.session_state.user['coupon'] += STAMP_REWARD_AMOUNT
+        st.session_state.users_db[phone_suffix]['coupon'] += STAMP_REWARD_AMOUNT
+        
+        # 스탬프 리셋
+        st.session_state.user['stamps'] = current_stamps - STAMP_GOAL
+        st.session_state.users_db[phone_suffix]['stamps'] = current_stamps - STAMP_GOAL
+        
+        st.balloons()
+        st.success(f"🎉 **스탬프 {STAMP_GOAL}개 달성!** {money(STAMP_REWARD_AMOUNT)} 상당의 아메리카노 쿠폰이 지급되었습니다.")
+    
+    # 5. 장바구니 비우고 새로고침
+    st.session_state.cart = []
+    st.rerun()
 
 # ---------------- 메인 앱 페이지 ----------------
 def show_main_app():
@@ -352,6 +427,7 @@ def show_main_app():
 
     # ---------------- 탭 ----------------
     tab_reco, tab_menu, tab_cart = st.tabs(["🤖 AI 메뉴 추천", "📋 메뉴판", "🛍️ 장바구니"])
+    tab_reco, tab_menu, tab_cart, tab_history = st.tabs(["🤖 AI 메뉴 추천", "📋 메뉴판", "🛍️ 장바구니", "❤️ 스탬프 & 내역"])
 
     # ===== 추천 로직 =====
     with tab_reco:
@@ -390,6 +466,7 @@ def show_main_app():
                 # --- 공통 필터링: 음료 및 예산 설정 ---
                 drinks = drink_df[drink_df["category"].isin(st.session_state.sel_cats)] if st.session_state.sel_cats else drink_df
                 bakery_base = bakery_df.copy()
+                bakery_base = bakery_df.copy() # 기본 스코어 (인기 점수 포함)
 
                 n_people_val = st.session_state.n_people
 
@@ -406,12 +483,23 @@ def show_main_app():
                     max_budget = float('inf') # 무제한
 
                 # --- Phase 1: 엄격한 조건 (태그 필터링 적용) ---
+                # --- Phase 1: 엄격한 조건 (태그 필터링 및 점수 부스팅 적용) ---
                 bakery_strict = bakery_base.copy()
+                
                 if st.session_state.sel_tags:
                     tagset = set(st.session_state.sel_tags)
                     # Strict filter: must contain at least one of the selected tags
+                    
+                    # 1. 엄격한 필터: 선택된 태그 중 하나 이상을 포함하는 베이커리만 선택
                     bakery_strict = bakery_strict[bakery_strict["tags_list"].apply(lambda xs: not tagset.isdisjoint(set(xs)))]
+                    
+                    # 2. **취향 가산점 부스팅**: 필터링된 메뉴의 점수를 크게 높여서 추천 순위 보장
+                    bakery_strict["score"] = bakery_strict.apply(
+                        lambda row: row["score"] + TAG_BONUS_SCORE, 
+                        axis=1
+                    )
 
+                # 가산점이 반영된 strict 목록으로 조합 시도
                 results = find_combinations(drinks, bakery_strict, n_people_val, st.session_state.n_bakery, max_budget)
                 is_fallback = False
 
@@ -419,6 +507,7 @@ def show_main_app():
                 if not results and st.session_state.sel_tags:
                     is_fallback = True
                     # 태그 필터링을 풀고 전체 베이커리 목록으로 다시 시도
+                    # 태그 필터링을 풀고 (점수 부스팅 없이) 전체 베이커리 목록으로 다시 시도
                     results = find_combinations(drinks, bakery_base, n_people_val, st.session_state.n_bakery, max_budget)
 
                 if not results:
@@ -427,6 +516,7 @@ def show_main_app():
                     st.session_state.is_reco_fallback = False
                 else:
                     # 최종 정렬: 스코어 내림차순, 총액 오름차순 (인기 메뉴 우선)
+                    # 최종 정렬: 스코어 내림차순 (취향 가산점이 반영되어 취향 일치 메뉴가 최우선), 총액 오름차순
                     sorted_results = sorted(results, key=lambda x: (-x["score"], x["total"]))[:3]
                     st.session_state.reco_results = sorted_results
                     st.session_state.is_reco_fallback = is_fallback
@@ -551,6 +641,7 @@ def show_main_app():
                     if st.button("X", key=remove_key, type="secondary"):
                         st.session_state.cart.pop(i)
                         st.toast(f"{item['name']}을 삭제했습니다.")
+                        st.toast(f"**{item['name']}**을 삭제했습니다.")
                         st.rerun()
 
             st.markdown("---")
@@ -569,6 +660,8 @@ def show_main_app():
 
             note = st.text_area("요청사항", height=50)
 
+            
+            # --- 주문 완료 버튼 ---
             if st.button("주문 완료 및 매장 알림", type="primary", use_container_width=True):
                 # NOTE: 이메일 전송 기능은 SMTP 설정이 필요합니다.
                 if OWNER_EMAIL_PRIMARY == "owner@example.com" or not SMTP_PASS:
@@ -581,14 +674,20 @@ def show_main_app():
                         st.session_state.users_db[st.session_state.user['phone']]['coupon'] = 0
                     st.success(f"주문이 성공적으로 접수되었습니다! 최종 결제 금액: {money(final_total)} (카운터 결제)")
                     st.rerun()
+                phone_suffix = st.session_state.user['phone']
+                oid = f"O{datetime.now().strftime('%m%d%H%M%S')}"
 
+                # 1. 이메일 전송 (알림)
+                if OWNER_EMAIL_PRIMARY == "owner@example.com" or not SMTP_PASS:
+                    st.error("⚠️ 사장님 이메일 또는 SMTP 설정이 올바르지 않아 주문 알림을 보낼 수 없습니다. (개발 환경)")
+                    ok, err = True, "" # 개발 환경에서는 알림 실패해도 주문 처리 진행
                 else:
                     oid = f"O{datetime.now().strftime('%m%d%H%M%S')}"
                     ok, err = send_order_email(
                         [OWNER_EMAIL_PRIMARY], SHOP_NAME, oid, 
                         df_cart.to_dict("records"), final_total, note
                     )
-
+                    
                     if ok:
                         st.success(f"주문번호 **#{oid}** 접수 완료. 매장으로 알림 이메일이 발송되었습니다. 최종 금액: {money(final_total)} (카운터 결제)")
                         # 주문 후 장바구니 비우기
@@ -599,7 +698,51 @@ def show_main_app():
                         st.rerun()
                     else:
                         st.error(f"주문 알림 이메일 전송에 실패했습니다: {err}")
+                
+                # 2. 주문 처리 및 스탬프/내역 업데이트
+                if ok:
+                    process_order_completion(phone_suffix, oid, df_cart, total, final_total, use_coupon)
+                    # process_order_completion에서 rerun()을 호출하므로 아래 코드는 실행되지 않음
+                else:
+                    st.error(f"주문 알림 이메일 전송에 실패했습니다: {err}. 주문은 접수되지 않았습니다.")
 
+
+    # ===== 스탬프 & 주문 내역 =====
+    with tab_history:
+        st.header("❤️ 스탬프 & 주문 내역")
+        
+        # --- 스탬프 현황 ---
+        current_stamps = st.session_state.user.get('stamps', 0)
+        st.subheader("스탬프 적립 현황")
+        
+        # Custom display for stamps
+        heart_display = "❤️" * current_stamps + "🤍" * max(0, STAMP_GOAL - current_stamps)
+        st.markdown(f"""
+            ### 현재 스탬프: {heart_display} ({current_stamps}/{STAMP_GOAL}개)
+            다음 리워드까지 **{max(0, STAMP_GOAL - current_stamps)}**개 남았습니다.
+            
+            **🎁 리워드:** 스탬프 {STAMP_GOAL}개 달성 시 **{money(STAMP_REWARD_AMOUNT)}** 상당의 아메리카노 쿠폰 증정!
+        """)
+        st.markdown("---")
+
+        # --- 주문 내역 ---
+        st.subheader("최근 주문 내역")
+        orders = st.session_state.user.get('orders', [])
+        
+        if not orders:
+            st.info("아직 주문 내역이 없습니다. 지금 첫 주문을 완료하고 스탬프를 적립하세요!")
+        else:
+            for order in orders:
+                # 주문 내역은 최신순으로 표시
+                with st.expander(f"**[{order['date'].split(' ')[0]}]** 주문번호 #{order['id']} | 최종 결제: **{money(order['final_total'])}**", expanded=False):
+                    st.markdown(f"**주문 시간:** {order['date']}")
+                    st.markdown(f"**총 금액:** {money(order['total'])}")
+                    st.markdown(f"**쿠폰 사용:** - {money(order['coupon_used'])}")
+                    st.markdown(f"**적립 스탬프:** {order['stamps_earned']}개")
+                    st.markdown("---")
+                    st.markdown("**주문 상품 목록**")
+                    for item in order['items']:
+                        st.write(f"- {item['name']} x {item['qty']} ({money(item['unit_price'])}/개)")
 
 # ---------------- 메인 실행 ----------------
 if __name__ == "__main__":
