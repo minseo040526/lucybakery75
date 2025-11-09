@@ -186,31 +186,33 @@ def send_order_email(to_emails, shop_name, order_id, items, total, note):
 def load_menu_data():
     """CSV 파일을 읽고 데이터프레임을 전처리하고 스코어를 부여합니다."""
     
-    # 파일명은 사용자가 업로드한 파일명과 정확히 일치해야 합니다.
+    # !!! 파일명을 업로드하신 파일명과 정확히 일치하도록 설정합니다.
     BAKERY_FILE = "Bakery_menu - Bakery_menu.csv"
     DRINK_FILE = "Drink_menu - Drink_menu.csv"
     
-    # os.path.exists()를 사용한 명시적 파일 존재 여부 확인 로직은 제거하고,
-    # pd.read_csv에서 발생하는 오류를 직접 처리하여 환경적 오류 가능성을 줄입니다.
-        
     def normalize_columns(df, is_drink=False):
         df = df.copy()
         df.columns = [c.strip().lower() for c in df.columns]
         if is_drink:
+            # 음료 메뉴는 'category'와 'price'가 필요
             required = ["name","price","category"]
         else:
+            # 베이커리 메뉴는 'tags'가 필요
             if "tags" not in df.columns: df["tags"] = ""
             required = ["name","price","tags"]
         
         for c in required:
-            if c not in df.columns: st.error(f"{c} 컬럼이 없습니다."); st.stop()
+            if c not in df.columns: 
+                col_type = "음료" if is_drink else "베이커리"
+                st.error(f"🚨 **[컬럼 오류]** {col_type} 메뉴 파일에 필수 컬럼 **'{c}'**이(가) 없습니다. 파일을 확인해주세요.")
+                st.stop()
 
         df["name"] = df["name"].apply(normalize_str)
         if "category" in df.columns:
             df["category"] = df["category"].apply(normalize_str)
         df["price"] = pd.to_numeric(df["price"], errors="coerce")
         if df["price"].isnull().any():
-            st.error("가격 정보가 잘못된 항목이 있습니다."); st.stop()
+            st.error("🚨 **[데이터 오류]** 가격 정보가 잘못된 항목이 있습니다. 가격 컬럼에 숫자만 있는지 확인해주세요."); st.stop()
 
         # 태그 리스트 생성
         if "tags" in df.columns:
@@ -239,7 +241,7 @@ def load_menu_data():
     try:
         bakery_df = normalize_columns(pd.read_csv(BAKERY_FILE), is_drink=False)
     except FileNotFoundError:
-        st.error(f"🚨 **[필수 파일 오류]** 베이커리 메뉴 파일 **'{BAKERY_FILE}'**을(를) 찾을 수 없습니다. 파일명을 정확히 확인해주세요.")
+        st.error(f"🚨 **[필수 파일 오류]** 베이커리 메뉴 파일 **'{BAKERY_FILE}'**을(를) 찾을 수 없습니다. 파일명을 정확히 확인하거나 올바르게 업로드했는지 확인해주세요.")
         st.stop()
     except Exception as e:
         st.error(f"🚨 베이커리 메뉴 파일을 로드하는 중 알 수 없는 오류가 발생했습니다: {type(e).__name__}: {e}")
@@ -248,7 +250,7 @@ def load_menu_data():
     try:
         drink_df  = normalize_columns(pd.read_csv(DRINK_FILE), is_drink=True)
     except FileNotFoundError:
-        st.error(f"🚨 **[필수 파일 오류]** 음료 메뉴 파일 **'{DRINK_FILE}'**을(를) 찾을 수 없습니다. 파일명을 정확히 확인해주세요.")
+        st.error(f"🚨 **[필수 파일 오류]** 음료 메뉴 파일 **'{DRINK_FILE}'**을(를) 찾을 수 없습니다. 파일명을 정확히 확인하거나 올바르게 업로드했는지 확인해주세요.")
         st.stop()
     except Exception as e:
         st.error(f"🚨 음료 메뉴 파일을 로드하는 중 알 수 없는 오류가 발생했습니다: {type(e).__name__}: {e}")
@@ -262,12 +264,9 @@ def load_menu_data():
 # try-except 블록을 유지하여 load_menu_data에서 발생한 오류를 잡아 사용자에게 표시
 try:
     bakery_df, drink_df, drink_categories, bakery_tags = load_menu_data()
-except Exception as e:
-    # load_menu_data 내부에서 st.stop()을 호출하지만, 혹시 모를 경우를 대비하여
-    if "필수 파일 오류" not in str(e):
-        st.error(f"메뉴 데이터를 로드하는 중 심각한 오류가 발생했습니다: {e}")
-    # 함수 내에서 이미 st.stop()을 호출했으므로 여기서는 추가 조치 없음
-    # st.stop()
+except Exception:
+    # load_menu_data 내부에서 st.stop()을 호출하므로, 여기서는 추가 조치 없음
+    pass
 
 # ---------------- 세션 및 로그인 데이터 ----------------
 if "logged_in" not in st.session_state: st.session_state.logged_in = False
@@ -282,22 +281,22 @@ if "users_db" not in st.session_state: st.session_state.users_db = {}
 def show_login_page():
     set_custom_style()
 
-    # 이미지 파일 이름 (사용자가 마지막으로 업로드한 파일 사용)
-    IMAGE_FILE_NAME = "제목을 입력해주세요.jpg"
+    # !!! 업로드된 이미지 파일명으로 수정합니다.
+    IMAGE_FILE_NAME = "스크린샷 2025-11-09 오후 9.54.24.jpg"
     
     # 1. 앱 대표 이미지 표시
     st.markdown("##") # 공간 확보
     try:
         # 파일 존재 여부를 확인하고 이미지를 표시합니다.
-        # 주의: 이미지 파일명도 정확히 일치해야 합니다.
         if os.path.exists(IMAGE_FILE_NAME):
             st.image(IMAGE_FILE_NAME, use_column_width=True, caption="환영합니다! 오늘 하루도 달콤하게 시작하세요.")
         else:
-            st.warning(f"⚠️ 대표 이미지 파일 **'{IMAGE_FILE_NAME}'**을 찾을 수 없습니다. 경로를 확인해주세요.")
+            # 이미지를 찾지 못했을 경우 명확한 경고를 표시합니다.
+            st.warning(f"⚠️ 대표 이미지 파일 **'{IMAGE_FILE_NAME}'**을 찾을 수 없습니다. 파일명을 확인해주세요.")
 
-    except Exception:
+    except Exception as e:
         # 혹시 모를 로딩 오류 처리
-        st.warning("이미지를 로드하는 중 오류가 발생했습니다.")
+        st.warning(f"이미지를 로드하는 중 오류가 발생했습니다: {e}")
 
     st.title(f"🥐 {SHOP_NAME}")
     st.header("휴대폰 번호 뒷자리로 로그인/회원가입")
@@ -474,6 +473,11 @@ def process_order_completion(phone_suffix, order_id, total, final_total, use_cou
 
 # ---------------- 메인 앱 페이지 ----------------
 def show_main_app():
+    # load_menu_data가 성공적으로 실행되었는지 확인
+    if 'bakery_df' not in globals() or bakery_df.empty:
+        st.error("🚨 메뉴 데이터 로드에 실패하여 앱을 표시할 수 없습니다. 파일 오류를 해결해 주세요.")
+        return
+        
     set_custom_style()
     st.title("🥐 AI 베이커리 추천·주문")
     
