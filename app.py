@@ -186,11 +186,13 @@ def send_order_email(to_emails, shop_name, order_id, items, total, note):
 def load_menu_data():
     """CSV 파일을 읽고 데이터프레임을 전처리하고 스코어를 부여합니다."""
     
-    # !!! 베이커리 메뉴 CSV 파일명을 업로드하신 파일명과 정확히 일치하도록 설정합니다.
-    BAKERY_FILE = "Bakery_menu - Bakery_menu.csv" 
-    DRINK_FILE = "Drink_menu - Drink_menu.csv"
+    # 🚨 사용자 요청에 따라 파일명을 간단하게 'Bakery_menu.csv'와 'Drink_menu.csv'로 수정합니다.
+    # 캔버스 환경에서는 실제 업로드된 파일명을 사용해야 합니다.
+    # 실제 업로드된 파일명 (이전 대화에서 확인된 것)
+    ACTUAL_BAKERY_FILE = "Bakery_menu - Bakery_menu.csv" 
+    ACTUAL_DRINK_FILE = "Drink_menu - Drink_menu.csv"
     
-    def normalize_columns(df, is_drink=False):
+    def normalize_columns(df, is_drink=False, file_name=""):
         df = df.copy()
         df.columns = [c.strip().lower() for c in df.columns]
         if is_drink:
@@ -204,7 +206,7 @@ def load_menu_data():
         for c in required:
             if c not in df.columns: 
                 col_type = "음료" if is_drink else "베이커리"
-                st.error(f"🚨 **[컬럼 오류]** {col_type} 메뉴 파일에 필수 컬럼 **'{c}'**이(가) 없습니다. 파일을 확인해주세요.")
+                st.error(f"🚨 **[컬럼 오류]** {col_type} 메뉴 파일({file_name})에 필수 컬럼 **'{c}'**이(가) 없습니다. 파일을 확인해주세요.")
                 st.stop()
 
         df["name"] = df["name"].apply(normalize_str)
@@ -212,7 +214,7 @@ def load_menu_data():
             df["category"] = df["category"].apply(normalize_str)
         df["price"] = pd.to_numeric(df["price"], errors="coerce")
         if df["price"].isnull().any():
-            st.error("🚨 **[데이터 오류]** 가격 정보가 잘못된 항목이 있습니다. 가격 컬럼에 숫자만 있는지 확인해주세요."); st.stop()
+            st.error(f"🚨 **[데이터 오류]** {file_name} 파일에 가격 정보가 잘못된 항목이 있습니다. 가격 컬럼에 숫자만 있는지 확인해주세요."); st.stop()
 
         # 태그 리스트 생성
         if "tags" in df.columns:
@@ -237,20 +239,25 @@ def load_menu_data():
         df["item_id"] = [f"{prefix}{i+1:04d}" for i in range(len(df))]
         return df
 
-    # 파일 읽기 시도 및 명확한 오류 처리
+    # 베이커리 파일 읽기 시도
     try:
-        bakery_df = normalize_columns(pd.read_csv(BAKERY_FILE), is_drink=False)
+        if not os.path.exists(ACTUAL_BAKERY_FILE):
+             st.warning(f"⚠️ **[파일 경고]** 베이커리 파일 **'{ACTUAL_BAKERY_FILE}'**을(를) 찾을 수 없습니다. 파일 이름에 불필요한 공백이나 특수 문자가 없는지 확인해주세요.")
+        bakery_df = normalize_columns(pd.read_csv(ACTUAL_BAKERY_FILE), is_drink=False, file_name=ACTUAL_BAKERY_FILE)
     except FileNotFoundError:
-        st.error(f"🚨 **[필수 파일 오류]** 베이커리 메뉴 파일 **'{BAKERY_FILE}'**을(를) 찾을 수 없습니다. 파일명을 정확히 확인하거나 올바르게 업로드했는지 확인해주세요.")
+        st.error(f"🚨 **[필수 파일 오류]** 베이커리 메뉴 파일 **'{ACTUAL_BAKERY_FILE}'**을(를) 찾을 수 없습니다. 파일명을 정확히 확인하거나 올바르게 업로드했는지 확인해주세요.")
         st.stop()
     except Exception as e:
         st.error(f"🚨 베이커리 메뉴 파일을 로드하는 중 알 수 없는 오류가 발생했습니다: {type(e).__name__}: {e}")
         st.stop()
 
+    # 음료 파일 읽기 시도
     try:
-        drink_df  = normalize_columns(pd.read_csv(DRINK_FILE), is_drink=True)
+        if not os.path.exists(ACTUAL_DRINK_FILE):
+             st.warning(f"⚠️ **[파일 경고]** 음료 파일 **'{ACTUAL_DRINK_FILE}'**을(를) 찾을 수 없습니다. 파일 이름에 불필요한 공백이나 특수 문자가 없는지 확인해주세요.")
+        drink_df  = normalize_columns(pd.read_csv(ACTUAL_DRINK_FILE), is_drink=True, file_name=ACTUAL_DRINK_FILE)
     except FileNotFoundError:
-        st.error(f"🚨 **[필수 파일 오류]** 음료 메뉴 파일 **'{DRINK_FILE}'**을(를) 찾을 수 없습니다. 파일명을 정확히 확인하거나 올바르게 업로드했는지 확인해주세요.")
+        st.error(f"🚨 **[필수 파일 오류]** 음료 메뉴 파일 **'{ACTUAL_DRINK_FILE}'**을(를) 찾을 수 없습니다. 파일명을 정확히 확인하거나 올바르게 업로드했는지 확인해주세요.")
         st.stop()
     except Exception as e:
         st.error(f"🚨 음료 메뉴 파일을 로드하는 중 알 수 없는 오류가 발생했습니다: {type(e).__name__}: {e}")
@@ -281,7 +288,7 @@ if "users_db" not in st.session_state: st.session_state.users_db = {}
 def show_login_page():
     set_custom_style()
 
-    # !!! 업로드된 이미지 파일명 "제목을 입력해주세요.jpg"으로 수정합니다.
+    # !!! 이미지 파일명은 사용자가 가장 최근에 업로드한 "제목을 입력해주세요.jpg"으로 고정합니다.
     IMAGE_FILE_NAME = "제목을 입력해주세요.jpg"
     
     # 1. 앱 대표 이미지 표시
@@ -761,6 +768,17 @@ def show_main_app():
                     items_df['총액'] = items_df.apply(lambda row: money(row['unit_price'] * row['qty']), axis=1)
                     st.dataframe(
                         items_df.rename(columns={'name':'메뉴명', 'qty':'수량'}),
+                        hide_index=True,
+                        use_container_width=True,
+                        column_order=('메뉴명', '수량', '단가', '총액')
+                    )
+
+
+# ---------------- 메인 실행 ----------------
+if st.session_state.logged_in:
+    show_main_app()
+else:
+    show_login_page()
                         hide_index=True,
                         use_container_width=True,
                         column_order=('메뉴명', '수량', '단가', '총액')
