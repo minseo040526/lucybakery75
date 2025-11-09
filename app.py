@@ -95,6 +95,7 @@ def load_menu_data():
         df["item_id"] = [f"{prefix}{i+1:04d}" for i in range(len(df))]
         return df
 
+    # NOTE: These files are assumed to be accessible in the environment.
     bakery_df = normalize_columns(pd.read_csv("Bakery_menu.csv"), is_drink=False)
     drink_df  = normalize_columns(pd.read_csv("Drink_menu.csv"), is_drink=True)
     drink_categories = sorted(drink_df["category"].dropna().unique())
@@ -160,6 +161,17 @@ def show_login_page():
                 st.balloons()
                 st.rerun()
 
+# ---------------- 장바구니 추가 헬퍼 ----------------
+def add_item_to_cart(item, qty=1):
+    """장바구니에 아이템을 추가하고 토스트 메시지를 표시합니다."""
+    st.session_state.cart.append({
+        "item_id": item["item_id"], "name": item["name"], 
+        "type": item["type"], "category": item.get("category", ""), 
+        "qty": qty, "unit_price": int(item["price"])
+    })
+    st.toast(f"{item['name']} {qty}개를 장바구니에 담았습니다.")
+
+
 # ---------------- 메인 앱 페이지 ----------------
 def show_main_app():
     st.header("🥐 AI 베이커리 추천·주문")
@@ -192,10 +204,15 @@ def show_main_app():
         with c1:
             # 인원수/음료 수량
             n_people = st.number_input("인원 수 (음료 잔 수)", 1, 20, 2, key="n_people")
-            # 예산 설정
-            budget_type = st.selectbox("예산 기준", ["총예산", "1인예산"], key="budget_type")
-            budget_val = st.number_input("금액 (원)", min_value=0, value=15000, step=500, key="budget_val")
-
+            
+            # 예산 설정 통합 및 무제한 옵션 추가
+            budget_choice = st.radio("예산 기준 (1인)", ["무제한", "금액 직접 입력"], index=1, key="budget_choice")
+            
+            current_budget_val = 0
+            if budget_choice == "금액 직접 입력":
+                # 1인 예산 금액을 입력받아 session_state에 저장
+                current_budget_val = st.number_input("1인 예산 금액 (원)", min_value=1, value=7500, step=500, key="input_budget_val")
+            
         with c2:
             # 베이커리 개수
             n_bakery = st.slider("베이커리 개수", 0, 5, 2, key="n_bakery")
@@ -211,13 +228,21 @@ def show_main_app():
         # 'AI 추천 보기' 버튼을 눌렀을 때만 추천 결과를 계산하여 세션에 저장
         if st.button("AI 추천 보기", type="primary", use_container_width=True):
             with st.spinner("최적의 메뉴를 조합하고 있습니다..."):
-                drinks = drink_df[drink_df["category"].isin(sel_cats)] if sel_cats else drink_df
+                drinks = drink_df[drink_df["category"].isin(st.session_state.sel_cats)] if st.session_state.sel_cats else drink_df
                 bakery = bakery_df.copy()
                 
-                # 태그 필터링: 선택된 태그 중 하나라도 포함하는 베이커리 필터
-                if sel_tags:
-                    tagset = set(sel_tags)
+                # 태그 필터링
+                if st.session_state.sel_tags:
+                    tagset = set(st.session_state.sel_tags)
                     bakery = bakery[bakery["tags_list"].apply(lambda xs: not tagset.isdisjoint(set(xs)))]
+                
+                # 예산 계산: 버튼 클릭 시점의 session_state 값 사용
+                n_people_val = st.session_state.n_people
+                if st.session_state.budget_choice == "금액 직접 입력":
+                    budget_per_person = st.session_state.get('input_budget_val', 0)
+                    max_budget = budget_per_person * n_people_val
+                else:
+                    max_budget = float('inf') # 무제한
                 
                 results = []
                 
@@ -225,14 +250,12 @@ def show_main_app():
                 for d in drinks.head(10).to_dict("records"):
                     b_items = bakery.head(10).to_dict("records")
                     # 빵 개수가 0개일 때 빈 리스트를 반환하도록 처리
-                    combos = itertools.combinations(b_items, n_bakery) if n_bakery > 0 else [[]]
+                    combos = itertools.combinations(b_items, st.session_state.n_bakery) if st.session_state.n_bakery > 0 else [[]]
 
                     for b_combo in combos:
-                        total_price = d["price"] * n_people + sum(b["price"] for b in b_combo)
+                        total_price = d["price"] * n_people_val + sum(b["price"] for b in b_combo)
                         
                         # 예산 체크 로직
-                        max_budget = budget_val if budget_type == "총예산" else budget_val * n_people
-                        
                         if total_price <= max_budget:
                              results.append({"drink": d, "bakery": b_combo, "total": total_price})
 
@@ -248,6 +271,9 @@ def show_main_app():
         if st.session_state.reco_results:
             st.subheader("2. AI 추천 세트")
             
+            # n_people은 현재 n_people 위젯의 값으로 사용
+            current_n_people = st.session_state.n_people
+            
             for i, r in enumerate(st.session_state.reco_results, start=1):
                 st.markdown(f"**--- 추천 세트 {i} ---**")
                 
@@ -256,17 +282,12 @@ def show_main_app():
                 # --- 음료 ---
                 with col1:
                     st.markdown("##### 🍹 음료")
-                    st.write(f"**{r['drink']['name']}** ({money(r['drink']['price'])} x {n_people}잔)")
+                    st.write(f"**{r['drink']['name']}** ({money(r['drink']['price'])} x {current_n_people}잔)")
                     st.write(f"카테고리: {r['drink']['category']}")
                     
                     # 장바구니에 담기 (st.rerun 없이 바로 상태 업데이트)
-                    if st.button(f"🛒 음료 {n_people}잔 담기", key=f"d_reco_{i}", use_container_width=True):
-                        st.session_state.cart.append({
-                            "item_id": r["drink"]["item_id"], "name": r["drink"]["name"],
-                            "type": "drink", "category": r["drink"]["category"],
-                            "qty": n_people, "unit_price": int(r["drink"]["price"])
-                        })
-                        st.toast(f"{r['drink']['name']} {n_people}잔을 장바구니에 담았습니다.")
+                    if st.button(f"🛒 음료 {current_n_people}잔 담기", key=f"d_reco_{i}", use_container_width=True):
+                        add_item_to_cart(r["drink"], qty=current_n_people)
 
                 # --- 베이커리 ---
                 with col2:
@@ -278,11 +299,7 @@ def show_main_app():
                             
                             # 장바구니에 담기 (st.rerun 없이 바로 상태 업데이트)
                             if st.button(f"🛒 {b['name']} 담기", key=f"b_reco_{i}_{j}", use_container_width=True):
-                                st.session_state.cart.append({
-                                    "item_id": b["item_id"], "name": b["name"], "type": "bakery",
-                                    "category": "", "qty": 1, "unit_price": int(b["price"])
-                                })
-                                st.toast(f"{b['name']}을 장바구니에 담았습니다.")
+                                add_item_to_cart(b, qty=1)
                     else:
                          st.write("- 베이커리 선택 안 함")
                 
@@ -295,22 +312,36 @@ def show_main_app():
         st.title("📋 전체 메뉴판")
         
         st.subheader("🍞 베이커리 메뉴")
-        st.dataframe(
-            bakery_df[["name","price","tags"]].rename(
-                columns={"name":"메뉴명", "price":"가격", "tags":"태그"}
-            ),
-            use_container_width=True,
-            hide_index=True
-        )
+        st.markdown(f"**총 {len(bakery_df)}개 품목**")
+        
+        # 베이커리 메뉴를 반복하여 출력하고 '담기' 버튼 추가
+        # 3, 2, 4, 2 컬럼 비율: 메뉴명, 가격, 태그, 버튼
+        for i, item in bakery_df.iterrows():
+            c1, c2, c3, c4 = st.columns([3, 2, 4, 2])
+            with c1: st.write(f"**{item['name']}**")
+            with c2: st.write(money(item['price']))
+            with c3: st.caption(f"태그: {', '.join(item['tags_list'])}")
+            with c4:
+                # 고유 키: menu_b_아이템ID
+                if c4.button("🛒 담기", key=f"menu_b_{item['item_id']}", use_container_width=True):
+                    add_item_to_cart(item, qty=1)
+
+        st.markdown("---")
         
         st.subheader("☕ 음료 메뉴")
-        st.dataframe(
-            drink_df[["category","name","price"]].rename(
-                columns={"category":"카테고리", "name":"메뉴명", "price":"가격"}
-            ),
-            use_container_width=True,
-            hide_index=True
-        )
+        st.markdown(f"**총 {len(drink_df)}개 품목**")
+        
+        # 음료 메뉴를 반복하여 출력하고 '담기' 버튼 추가
+        # 3, 2, 4, 2 컬럼 비율: 메뉴명, 가격, 카테고리, 버튼
+        for i, item in drink_df.iterrows():
+            c1, c2, c3, c4 = st.columns([3, 2, 4, 2])
+            with c1: st.write(f"**{item['name']}**")
+            with c2: st.write(money(item['price']))
+            with c3: st.caption(f"카테고리: {item['category']}")
+            with c4:
+                # 고유 키: menu_d_아이템ID
+                if c4.button("🛒 담기", key=f"menu_d_{item['item_id']}", use_container_width=True):
+                    add_item_to_cart(item, qty=1)
 
     # ===== 장바구니 =====
     with tab_cart:
@@ -319,6 +350,7 @@ def show_main_app():
         if not st.session_state.cart:
             st.info("장바구니가 비어 있습니다. AI 추천 탭이나 메뉴판 탭에서 상품을 담아주세요.")
         else:
+            # 장바구니 리스트를 데이터프레임으로 변환 (수량 변경 및 삭제 시 세션 상태를 직접 수정)
             df_cart = pd.DataFrame(st.session_state.cart)
             df_cart["total_price"] = df_cart["qty"] * df_cart["unit_price"]
 
@@ -337,7 +369,6 @@ def show_main_app():
                     # 수량 변경 시 세션 상태에 반영
                     if qty != item["qty"]:
                         st.session_state.cart[i]["qty"] = int(qty)
-                        st.session_state.modified_cart = True
                         st.rerun() # 수량이 변경되면 바로 화면을 업데이트
 
                 with c4: st.write(f"**{money(item['total_price'])}**")
@@ -402,3 +433,4 @@ if __name__ == "__main__":
         show_main_app()
     else:
         show_login_page()
+        
