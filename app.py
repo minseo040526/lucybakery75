@@ -486,3 +486,4 @@ with tab_cart:
                 if len(idx2)==1:
                     orders.loc[idx2[0], "notify_error"] = err; save_csv(orders, ORDERS_CSV)
                 st.warning(f"주문 저장 완료, 이메일 실패: {err}")
+
