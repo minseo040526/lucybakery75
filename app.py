@@ -186,8 +186,8 @@ def send_order_email(to_emails, shop_name, order_id, items, total, note):
 def load_menu_data():
     """CSV 파일을 읽고 데이터프레임을 전처리하고 스코어를 부여합니다."""
     
-    # !!! 파일명을 업로드하신 파일명과 정확히 일치하도록 설정합니다.
-    BAKERY_FILE = "Bakery_menu - Bakery_menu.csv"
+    # !!! 베이커리 메뉴 CSV 파일명을 업로드하신 파일명과 정확히 일치하도록 설정합니다.
+    BAKERY_FILE = "Bakery_menu - Bakery_menu.csv" 
     DRINK_FILE = "Drink_menu - Drink_menu.csv"
     
     def normalize_columns(df, is_drink=False):
@@ -281,8 +281,8 @@ if "users_db" not in st.session_state: st.session_state.users_db = {}
 def show_login_page():
     set_custom_style()
 
-    # !!! 업로드된 이미지 파일명으로 수정합니다.
-    IMAGE_FILE_NAME = "스크린샷 2025-11-09 오후 9.54.24.jpg"
+    # !!! 업로드된 이미지 파일명 "제목을 입력해주세요.jpg"으로 수정합니다.
+    IMAGE_FILE_NAME = "제목을 입력해주세요.jpg"
     
     # 1. 앱 대표 이미지 표시
     st.markdown("##") # 공간 확보
