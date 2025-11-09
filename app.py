@@ -185,6 +185,18 @@ def send_order_email(to_emails, shop_name, order_id, items, total, note):
 @st.cache_data
 def load_menu_data():
     """CSV 파일을 읽고 데이터프레임을 전처리하고 스코어를 부여합니다."""
+    
+    BAKERY_FILE = "Bakery_menu - Bakery_menu.csv"
+    DRINK_FILE = "Drink_menu - Drink_menu.csv"
+    
+    # 파일 존재 여부 확인 및 명확한 오류 메시지 제공
+    if not os.path.exists(BAKERY_FILE):
+        st.error(f"🚨 **[필수 파일 오류]** 베이커리 메뉴 파일 **'{BAKERY_FILE}'**을(를) 찾을 수 없습니다. 파일을 올바르게 업로드했는지 확인하거나 파일명을 수정해주세요.")
+        st.stop()
+    if not os.path.exists(DRINK_FILE):
+        st.error(f"🚨 **[필수 파일 오류]** 음료 메뉴 파일 **'{DRINK_FILE}'**을(를) 찾을 수 없습니다. 파일을 올바르게 업로드했는지 확인하거나 파일명을 수정해주세요.")
+        st.stop()
+        
     def normalize_columns(df, is_drink=False):
         df = df.copy()
         df.columns = [c.strip().lower() for c in df.columns]
@@ -227,15 +239,23 @@ def load_menu_data():
         df["item_id"] = [f"{prefix}{i+1:04d}" for i in range(len(df))]
         return df
 
-    # NOTE: These files are assumed to be accessible in the environment.
-    bakery_df = normalize_columns(pd.read_csv("Bakery_menu - Bakery_menu.csv"), is_drink=False)
-    drink_df  = normalize_columns(pd.read_csv("Drink_menu - Drink_menu.csv"), is_drink=True)
+    # 파일 읽기
+    bakery_df = normalize_columns(pd.read_csv(BAKERY_FILE), is_drink=False)
+    drink_df  = normalize_columns(pd.read_csv(DRINK_FILE), is_drink=True)
+    
     drink_categories = sorted(drink_df["category"].dropna().unique())
     bakery_tags = sorted({t for arr in bakery_df["tags_list"] for t in arr if t})
     
     return bakery_df, drink_df, drink_categories, bakery_tags
 
-bakery_df, drink_df, drink_categories, bakery_tags = load_menu_data()
+try:
+    bakery_df, drink_df, drink_categories, bakery_tags = load_menu_data()
+except Exception as e:
+    # load_menu_data 내부에서 st.stop()을 호출하지만, 혹시 모를 경우를 대비하여
+    if "필수 파일 오류" not in str(e):
+        st.error(f"메뉴 데이터를 로드하는 중 심각한 오류가 발생했습니다: {e}")
+    # 함수 내에서 이미 st.stop()을 호출했으므로 여기서는 추가 조치 없음
+    # st.stop()
 
 # ---------------- 세션 및 로그인 데이터 ----------------
 if "logged_in" not in st.session_state: st.session_state.logged_in = False
@@ -251,17 +271,20 @@ def show_login_page():
     set_custom_style()
 
     # 이미지 파일 이름 (사용자가 마지막으로 업로드한 파일 사용)
-    # Streamlit 환경에서는 이 파일 경로를 사용합니다.
     IMAGE_FILE_NAME = "제목을 입력해주세요.jpg"
     
     # 1. 앱 대표 이미지 표시
     st.markdown("##") # 공간 확보
     try:
-        # st.image() 함수를 사용하여 이미지를 표시합니다. use_column_width=True로 설정하여 너비에 맞게 조정합니다.
-        # 이미지 파일명을 사용하여 로드합니다.
-        st.image(IMAGE_FILE_NAME, use_column_width=True, caption="환영합니다! 오늘 하루도 달콤하게 시작하세요.")
-    except FileNotFoundError:
-        st.warning(f"⚠️ 이미지 파일 '{IMAGE_FILE_NAME}'을 찾을 수 없습니다. 경로를 확인해주세요.")
+        # 파일 존재 여부를 확인하고 이미지를 표시합니다.
+        if os.path.exists(IMAGE_FILE_NAME):
+            st.image(IMAGE_FILE_NAME, use_column_width=True, caption="환영합니다! 오늘 하루도 달콤하게 시작하세요.")
+        else:
+            st.warning(f"⚠️ 대표 이미지 파일 **'{IMAGE_FILE_NAME}'**을 찾을 수 없습니다. 경로를 확인해주세요.")
+
+    except Exception:
+        # 혹시 모를 로딩 오류 처리
+        st.warning("이미지를 로드하는 중 오류가 발생했습니다.")
 
     st.title(f"🥐 {SHOP_NAME}")
     st.header("휴대폰 번호 뒷자리로 로그인/회원가입")
