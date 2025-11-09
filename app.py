@@ -186,11 +186,9 @@ def send_order_email(to_emails, shop_name, order_id, items, total, note):
 def load_menu_data():
     """CSV 파일을 읽고 데이터프레임을 전처리하고 스코어를 부여합니다."""
     
-    # 🚨 사용자 요청에 따라 파일명을 간단하게 'Bakery_menu.csv'와 'Drink_menu.csv'로 수정합니다.
-    # 캔버스 환경에서는 실제 업로드된 파일명을 사용해야 합니다.
-    # 실제 업로드된 파일명 (이전 대화에서 확인된 것)
-    ACTUAL_BAKERY_FILE = "Bakery_menu - Bakery_menu.csv" 
-    ACTUAL_DRINK_FILE = "Drink_menu - Drink_menu.csv"
+    # 🚨 사용자 요청에 따라 파일명을 'Bakery_menu.csv'와 'Drink_menu.csv'로 수정합니다.
+    ACTUAL_BAKERY_FILE = "Bakery_menu.csv" 
+    ACTUAL_DRINK_FILE = "Drink_menu.csv"
     
     def normalize_columns(df, is_drink=False, file_name=""):
         df = df.copy()
@@ -630,163 +628,213 @@ def show_main_app():
                             # 베이커리 추가 (각 1개씩)
                             for b in reco['bakery']:
                                 add_item_to_cart(b, 1)
-                            
-                            st.toast(f"추천 {i+1} 조합이 모두 장바구니에 추가되었습니다!", icon="✅")
-                            st.rerun() # 토스트 표시 후 재실행
+                            st.rerun() # 장바구니 업데이트 후 새로고침
 
-    # ===== 메뉴판 =====
+    # ===== 메뉴판 탭 =====
     with tab_menu:
         st.header("📋 전체 메뉴판")
         
-        # 베이커리
-        st.subheader("갓 구운 베이커리 🍞")
-        bakery_cols = st.columns(3)
-        for i, item in enumerate(bakery_df.to_dict("records")):
-            with bakery_cols[i % 3]:
-                with st.container(border=True):
-                    tags = ", ".join(f"#{t}" for t in item["tags_list"])
-                    st.markdown(f"**{item['name']}**")
-                    st.markdown(f"가격: **{money(item['price'])}**")
-                    st.caption(tags)
-                    if st.button("장바구니 담기", key=f"add_b_{item['item_id']}", use_container_width=True):
-                        add_item_to_cart(item)
+        # 1. 음료 메뉴
+        st.subheader("☕ 음료 메뉴")
+        st.dataframe(
+            drink_df.drop(columns=["tags","tags_list","score","type","item_id"]), 
+            column_config={
+                "name": "메뉴",
+                "price": st.column_config.NumberColumn("가격 (원)", format="%d"),
+                "category": "분류",
+                "sweetness": "당도(0~5)",
+            },
+            hide_index=True,
+            use_container_width=True
+        )
 
-        st.markdown("---")
+        # 2. 베이커리 메뉴
+        st.subheader("🍞 베이커리 메뉴")
+        st.dataframe(
+            bakery_df.drop(columns=["tags","tags_list","score","type","item_id"]), 
+            column_config={
+                "name": "메뉴",
+                "price": st.column_config.NumberColumn("가격 (원)", format="%d"),
+                "category": "분류",
+                "sweetness": "당도(1~5)"
+            },
+            hide_index=True,
+            use_container_width=True
+        )
         
-        # 음료
-        st.subheader("신선한 음료 ☕")
-        for category in drink_categories:
-            st.caption(f"**{category}**")
-            cat_df = drink_df[drink_df["category"] == category]
-            
-            drink_cols = st.columns(3)
-            for i, item in enumerate(cat_df.to_dict("records")):
-                with drink_cols[i % 3]:
-                    with st.container(border=True):
-                        st.markdown(f"**{item['name']}**")
-                        st.markdown(f"가격: **{money(item['price'])}**")
-                        if st.button("장바구니 담기", key=f"add_d_{item['item_id']}", use_container_width=True):
-                            add_item_to_cart(item)
+        st.markdown("---")
+        st.subheader("개별 메뉴 주문하기")
+        
+        # 메뉴 선택 및 수량 입력
+        col_select, col_qty, col_add = st.columns([5, 2, 2])
+        
+        all_menu = pd.concat([bakery_df, drink_df]).sort_values(by="name")
+        menu_options = all_menu.apply(lambda row: f"[{row['type'].upper()[0]}] {row['name']} ({money(row['price'])})", axis=1)
+        
+        with col_select:
+            selected_menu_display = st.selectbox("메뉴 선택", menu_options, index=None, placeholder="메뉴를 검색하거나 선택하세요...")
+        
+        with col_qty:
+            qty = st.number_input("수량", 1, 20, 1)
 
-    # ===== 장바구니 =====
+        if selected_menu_display:
+            selected_item = all_menu[all_menu.apply(lambda row: f"[{row['type'].upper()[0]}] {row['name']} ({money(row['price'])})" == selected_menu_display, axis=1)].iloc[0].to_dict()
+            with col_add:
+                st.markdown("##") # 공간 확보
+                if st.button("장바구니 담기", key="add_single_item", use_container_width=True, type="primary"):
+                    add_item_to_cart(selected_item, qty)
+
+    # ===== 장바구니 탭 =====
     with tab_cart:
         st.header("🛍️ 장바구니")
         
         if not st.session_state.cart:
-            st.info("장바구니가 비어있습니다. 메뉴를 담아보세요!")
-            
+            st.info("장바구니가 비어있습니다. AI 추천이나 메뉴판에서 메뉴를 담아주세요.")
+            return
+
+        # 장바구니 내용 테이블
+        cart_data = [
+            {
+                "메뉴": item['name'],
+                "분류": item['category'] or item['type'],
+                "단가": money(item['unit_price']),
+                "수량": item['qty'],
+                "합계": money(item['unit_price'] * item['qty']),
+                "ID": item['item_id'] # 내부 처리를 위해 ID 유지
+            } for item in st.session_state.cart
+        ]
+        df_cart_display = pd.DataFrame(cart_data)
+        
+        st.dataframe(
+            df_cart_display.drop(columns=["ID"]), 
+            column_config={"수량": st.column_config.NumberColumn(format="%d")},
+            use_container_width=True,
+            hide_index=True
+        )
+
+        # 총 금액 계산
+        total_price = sum(item['unit_price'] * item['qty'] for item in st.session_state.cart)
+        
+        st.markdown(f"### 💰 총 주문 금액: **{money(total_price)}**")
+        
+        st.markdown("---")
+
+        # 장바구니 수정/비우기
+        col_clear, col_edit_select = st.columns([1, 2])
+        with col_clear:
+            if st.button("장바구니 비우기", key="clear_cart_btn", use_container_width=True):
+                st.session_state.cart = []
+                st.rerun()
+
+        # 개별 항목 삭제
+        with col_edit_select:
+            items_to_remove = st.multiselect(
+                "삭제할 메뉴 선택", 
+                df_cart_display["메뉴"].tolist(), 
+                key="remove_items_multiselect"
+            )
+        
+        if items_to_remove:
+            # 삭제 로직 실행
+            items_to_keep = [
+                item for item in st.session_state.cart 
+                if item['name'] not in items_to_remove
+            ]
+            st.session_state.cart = items_to_keep
+            st.toast(f"선택된 {len(items_to_remove)}개 메뉴를 장바구니에서 삭제했습니다.", icon="🗑️")
+            st.rerun()
+        
+        st.markdown("---")
+        st.subheader("주문 및 결제 정보")
+
+        # 쿠폰 사용 옵션
+        user_coupon = st.session_state.user.get('coupon', 0)
+        use_coupon = False
+        final_total = total_price
+        
+        if user_coupon > 0:
+            use_coupon = st.checkbox(f"**{money(user_coupon)}** 쿠폰 사용 (총액에서 차감)", key="use_coupon_check")
+            if use_coupon:
+                final_total = max(0, total_price - user_coupon)
+                st.markdown(f"**할인 적용 금액**: **{money(user_coupon)}**")
+                st.markdown(f"### 💵 최종 결제 금액: **{money(final_total)}**")
+            else:
+                st.markdown(f"### 💵 최종 결제 금액: **{money(total_price)}**")
         else:
-            # 장바구니 목록 표시
-            df_cart = pd.DataFrame(st.session_state.cart)
-            df_cart["가격"] = df_cart.apply(lambda row: money(row["unit_price"]), axis=1)
-            df_cart["총액"] = df_cart.apply(lambda row: money(row["unit_price"] * row["qty"]), axis=1)
-            
-            display_df = df_cart[["name", "category", "qty", "가격", "총액"]].rename(
-                columns={"name": "메뉴명", "category": "종류", "qty": "수량"}
-            )
-            st.dataframe(display_df, use_container_width=True, hide_index=True)
-            
-            # 총액 계산
-            total_price = df_cart["unit_price"].dot(df_cart["qty"])
-            st.markdown(f"### 최종 주문 금액 (할인 전): **{money(total_price)}**")
+            st.markdown(f"### 💵 최종 결제 금액: **{money(total_price)}**")
+            st.caption("사용 가능한 쿠폰이 없습니다.")
 
-            st.markdown("---")
-            
-            # --- 결제 및 주문 ---
-            st.subheader("결제 및 주문하기")
-            
-            use_coupon = st.checkbox(
-                f"쿠폰 사용하기 ({money(st.session_state.user.get('coupon', 0))} 전액)", 
-                value=st.session_state.user.get('coupon', 0) > 0,
-                disabled=st.session_state.user.get('coupon', 0) == 0,
-                key="use_coupon"
-            )
+        note = st.text_area("주문 시 요청사항 (예: 덜 달게 해주세요)", height=50)
 
-            coupon_discount = st.session_state.user.get('coupon', 0) if use_coupon else 0
-            final_total = max(0, total_price - coupon_discount)
-
-            st.markdown(f"**할인 적용 금액:** {money(coupon_discount)}")
-            st.markdown(f"### **최종 결제 금액 (현장 결제):** <span style='color:{ACCENT_COLOR}; font-size: 1.5em; font-weight: bold;'>{money(final_total)}</span>", unsafe_allow_html=True)
-            
-            note = st.text_area("요청사항 (ex. 포장 요청, 픽업 시간 등)", key="order_note")
-
-            if st.button("주문 완료 및 현장 결제", key="complete_order", type="primary", use_container_width=True):
-                # 주문 ID 생성
-                order_id = f"ORD-{datetime.now().strftime('%Y%m%d%H%M%S')}-{st.session_state.user['phone']}"
-                
+        # 주문 완료 버튼
+        order_id = str(uuid.uuid4())[:8].upper() # 8자리 고유 주문번호
+        
+        if st.button(f"주문 완료하기 (현장 결제)", key="complete_order_btn", type="primary", use_container_width=True):
+            if total_price == 0:
+                st.error("주문 금액이 0원입니다. 메뉴를 선택해주세요.")
+            else:
                 # 주문 처리 함수 호출
                 process_order_completion(
                     st.session_state.user['phone'], 
                     order_id, 
                     total_price, 
                     final_total, 
-                    use_coupon,
+                    use_coupon, 
                     note
                 )
-
-
-    # ===== 스탬프 & 내역 =====
+    
+    # ===== 스탬프 & 내역 탭 =====
     with tab_history:
-        st.header("❤️ 스탬프 & 주문 내역")
+        st.header("❤️ 스탬프 및 주문 내역")
 
-        st.subheader("스탬프 적립 현황")
+        st.subheader("스탬프 현황")
         stamps = st.session_state.user.get('stamps', 0)
         
-        col_stamp, col_goal = st.columns(2)
-        with col_stamp:
-            st.metric("현재 스탬프", f"{stamps}개")
-        with col_goal:
-            remaining = STAMP_GOAL - (stamps % STAMP_GOAL)
-            st.metric("다음 리워드까지", f"{remaining}개 남음")
-            
-        progress_ratio = (stamps % STAMP_GOAL) / STAMP_GOAL
-        st.progress(progress_ratio)
-        st.caption(f"스탬프 {STAMP_GOAL}개 달성 시 **{money(STAMP_REWARD_AMOUNT)}** 쿠폰이 지급됩니다.")
+        progress_val = min(stamps / STAMP_GOAL, 1.0)
+        st.metric(label=f"현재 스탬프 개수 ({STAMP_GOAL}개 달성 시 {money(STAMP_REWARD_AMOUNT)} 쿠폰 지급)", value=f"{stamps} / {STAMP_GOAL} 개")
+        st.progress(progress_val)
+        
+        if stamps < STAMP_GOAL:
+            st.markdown(f"**{STAMP_GOAL - stamps}개**만 더 적립하면 {money(STAMP_REWARD_AMOUNT)} 쿠폰을 받을 수 있어요! ☕")
+        else:
+            st.success("리워드 쿠폰이 이미 지급되었습니다! 다음 목표를 향해 나아가세요!")
         
         st.markdown("---")
-
-        st.subheader("나의 주문 내역")
+        
+        st.subheader("최근 주문 내역")
         orders = st.session_state.user.get('orders', [])
         
         if not orders:
-            st.info("아직 주문 내역이 없습니다.")
+            st.info("아직 주문 내역이 없습니다. 첫 주문 후 내역이 여기에 표시됩니다.")
         else:
-            for order in orders:
-                with st.expander(f"주문일시: {order['date']} | 최종 결제: {money(order['final_total'])}", expanded=False):
-                    st.caption(f"**주문번호:** {order['id']}")
-                    st.caption(f"**총 주문액 (할인 전):** {money(order['total'])}")
-                    st.caption(f"**쿠폰 사용액:** {money(order['coupon_used'])}")
-                    st.caption(f"**적립 스탬프:** {order['stamps_earned']}개")
-                    st.caption(f"**요청사항:** {order.get('note', '없음')}")
+            for i, order in enumerate(orders[:10]): # 최대 10개만 표시
+                with st.expander(f"#{i+1} 주문번호: {order['id']} - {order['date']}", expanded=(i==0)):
                     
-                    st.markdown("---")
-                    st.markdown("**주문 상품:**")
+                    st.markdown(f"**최종 결제 금액**: **{money(order['final_total'])}**")
+                    if order['coupon_used'] > 0:
+                        st.markdown(f"할인 적용: {money(order['coupon_used'])}")
+                        
+                    st.markdown(f"스탬프 적립: {order['stamps_earned']}개")
                     
-                    # 주문 상품 목록 테이블로 표시
-                    items_df = pd.DataFrame(order['items'])
-                    items_df['단가'] = items_df['unit_price'].apply(money)
-                    items_df['총액'] = items_df.apply(lambda row: money(row['unit_price'] * row['qty']), axis=1)
+                    st.caption("주문 상세")
+                    item_df = pd.DataFrame(order['items'])
+                    
                     st.dataframe(
-                        items_df.rename(columns={'name':'메뉴명', 'qty':'수량'}),
+                        item_df, 
+                        column_config={
+                            "name": "메뉴",
+                            "qty": "수량",
+                            "unit_price": st.column_config.NumberColumn("단가", format="%d"),
+                        },
                         hide_index=True,
-                        use_container_width=True,
-                        column_order=('메뉴명', '수량', '단가', '총액')
+                        use_container_width=True
                     )
+                    st.markdown(f"요청사항: {order['note'] or '없음'}")
 
 
-# ---------------- 메인 실행 ----------------
-if st.session_state.logged_in:
-    show_main_app()
-else:
-    show_login_page()
-                        hide_index=True,
-                        use_container_width=True,
-                        column_order=('메뉴명', '수량', '단가', '총액')
-                    )
-
-
-# ---------------- 메인 실행 ----------------
-if st.session_state.logged_in:
-    show_main_app()
-else:
-    show_login_page()
+# ---------------- 앱 실행 ----------------
+if __name__ == "__main__":
+    if st.session_state.logged_in:
+        show_main_app()
+    else:
+        show_login_page()
