@@ -186,16 +186,12 @@ def send_order_email(to_emails, shop_name, order_id, items, total, note):
 def load_menu_data():
     """CSV 파일을 읽고 데이터프레임을 전처리하고 스코어를 부여합니다."""
     
+    # 파일명은 사용자가 업로드한 파일명과 정확히 일치해야 합니다.
     BAKERY_FILE = "Bakery_menu - Bakery_menu.csv"
     DRINK_FILE = "Drink_menu - Drink_menu.csv"
     
-    # 파일 존재 여부 확인 및 명확한 오류 메시지 제공
-    if not os.path.exists(BAKERY_FILE):
-        st.error(f"🚨 **[필수 파일 오류]** 베이커리 메뉴 파일 **'{BAKERY_FILE}'**을(를) 찾을 수 없습니다. 파일을 올바르게 업로드했는지 확인하거나 파일명을 수정해주세요.")
-        st.stop()
-    if not os.path.exists(DRINK_FILE):
-        st.error(f"🚨 **[필수 파일 오류]** 음료 메뉴 파일 **'{DRINK_FILE}'**을(를) 찾을 수 없습니다. 파일을 올바르게 업로드했는지 확인하거나 파일명을 수정해주세요.")
-        st.stop()
+    # os.path.exists()를 사용한 명시적 파일 존재 여부 확인 로직은 제거하고,
+    # pd.read_csv에서 발생하는 오류를 직접 처리하여 환경적 오류 가능성을 줄입니다.
         
     def normalize_columns(df, is_drink=False):
         df = df.copy()
@@ -239,15 +235,31 @@ def load_menu_data():
         df["item_id"] = [f"{prefix}{i+1:04d}" for i in range(len(df))]
         return df
 
-    # 파일 읽기
-    bakery_df = normalize_columns(pd.read_csv(BAKERY_FILE), is_drink=False)
-    drink_df  = normalize_columns(pd.read_csv(DRINK_FILE), is_drink=True)
+    # 파일 읽기 시도 및 명확한 오류 처리
+    try:
+        bakery_df = normalize_columns(pd.read_csv(BAKERY_FILE), is_drink=False)
+    except FileNotFoundError:
+        st.error(f"🚨 **[필수 파일 오류]** 베이커리 메뉴 파일 **'{BAKERY_FILE}'**을(를) 찾을 수 없습니다. 파일명을 정확히 확인해주세요.")
+        st.stop()
+    except Exception as e:
+        st.error(f"🚨 베이커리 메뉴 파일을 로드하는 중 알 수 없는 오류가 발생했습니다: {type(e).__name__}: {e}")
+        st.stop()
+
+    try:
+        drink_df  = normalize_columns(pd.read_csv(DRINK_FILE), is_drink=True)
+    except FileNotFoundError:
+        st.error(f"🚨 **[필수 파일 오류]** 음료 메뉴 파일 **'{DRINK_FILE}'**을(를) 찾을 수 없습니다. 파일명을 정확히 확인해주세요.")
+        st.stop()
+    except Exception as e:
+        st.error(f"🚨 음료 메뉴 파일을 로드하는 중 알 수 없는 오류가 발생했습니다: {type(e).__name__}: {e}")
+        st.stop()
     
     drink_categories = sorted(drink_df["category"].dropna().unique())
     bakery_tags = sorted({t for arr in bakery_df["tags_list"] for t in arr if t})
     
     return bakery_df, drink_df, drink_categories, bakery_tags
 
+# try-except 블록을 유지하여 load_menu_data에서 발생한 오류를 잡아 사용자에게 표시
 try:
     bakery_df, drink_df, drink_categories, bakery_tags = load_menu_data()
 except Exception as e:
@@ -277,6 +289,7 @@ def show_login_page():
     st.markdown("##") # 공간 확보
     try:
         # 파일 존재 여부를 확인하고 이미지를 표시합니다.
+        # 주의: 이미지 파일명도 정확히 일치해야 합니다.
         if os.path.exists(IMAGE_FILE_NAME):
             st.image(IMAGE_FILE_NAME, use_column_width=True, caption="환영합니다! 오늘 하루도 달콤하게 시작하세요.")
         else:
