@@ -606,4 +606,4 @@ if __name__ == "__main__":
     if st.session_state.logged_in:
         show_main_app()
     else:
-        show_login_pag
+        show_login_pag()
