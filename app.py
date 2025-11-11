@@ -545,18 +545,18 @@ def show_main_app():
     # ****************** 오늘의 추천 메뉴 및 이벤트 ******************
     st.subheader("📢 오늘의 혜택 & 추천 메뉴")
     tab_event, tab_reco_jam, tab_reco_salt = st.tabs(["🎁 이벤트", "🥪 오늘의 추천: 잠봉 뵈르", "☕ 오늘의 추천: 아메리카노 & 소금빵"])
-    
-   with tab_event:
+    with tab_event:
     with st.expander("이벤트 보기", expanded=False):
         st.image("event1.jpg", caption="앱 사용 인증샷으로 쿠키도 받고 디저트 세트도 받으세요!", use_column_width=True)
 
-with tab_reco_jam:
+    with tab_reco_jam:
     with st.expander("잠봉 뵈르 포스터 보기", expanded=False):
         st.image("poster2.jpg", caption="오늘의 든든한 점심 추천! 바삭한 바게트에 햄과 버터의 조화!", use_column_width=True)
 
-with tab_reco_salt:
+    with tab_reco_salt:
     with st.expander("소금빵 세트 포스터 보기", expanded=False):
         st.image("poster1.jpg", caption="국민 조합! 짭짤 고소한 소금빵과 시원한 아메리카노 세트!", use_column_width=True)
+
 
     # *************************************************************************
 
