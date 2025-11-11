@@ -6,7 +6,6 @@ from email.utils import formatdate
 from datetime import datetime
 from PIL import Image
 import json 
-import base64 # <-- Base64 모듈 추가
 
 # ---------------- 기본 설정 ----------------
 st.set_page_config(page_title="AI 베이커리 추천·주문", layout="wide")
@@ -35,35 +34,13 @@ TAG_BONUS_SCORE = 5 # 선택 태그 일치 메뉴에 부여할 가산점
 # JSON 파일 경로 설정
 DATA_FILE = "user_data.json"
 
-# ****************** 이미지 파일 경로 정의 ******************
-LOGIN_IMAGES_FILES = [
+# ****************** 이미지 경로 설정 ******************
+LOGIN_IMAGES = [
     "poster2.jpg", 
     "event1.jpg",   
     "poster1.jpg"   
 ]
-# *********************************************************
-
-# ---------------- 이미지 유틸리티 함수 (Base64 인코딩) ----------------
-def get_base64_image(image_file):
-    """파일을 읽어 Base64 문자열로 변환합니다. Streamlit Cloud 환경에서 CSS 배경 이미지 로딩 안정화."""
-    try:
-        with open(image_file, "rb") as f:
-            mime_type = "image/jpeg"
-            if image_file.lower().endswith(".png"):
-                mime_type = "image/png"
-
-            return f"data:{mime_type};base64,{base64.b64encode(f.read()).decode()}"
-    except FileNotFoundError:
-        print(f"경고: 배경 이미지 파일 '{image_file}'을 찾을 수 없습니다.")
-        return None
-
-# ****************** 이미지 데이터 사전 처리 ******************
-# 스크립트 실행 시 이미지 파일을 미리 Base64로 인코딩합니다.
-ENCODED_LOGIN_IMAGES = [
-    data for file_name in LOGIN_IMAGES_FILES 
-    if (data := get_base64_image(file_name)) is not None
-]
-# *********************************************************
+# *****************************************************
 
 
 # ---------------- JSON 유틸리티 함수 (데이터 영속성) ----------------
@@ -88,7 +65,7 @@ def save_user_data(data):
     with open(DATA_FILE, "w", encoding="utf-8") as f:
         json.dump(data, f, indent=4, ensure_ascii=False)
 
-# ---------------- 디자인 테마 적용 (Base64 이미지 사용) ----------------
+# ---------------- 디자인 테마 적용 (이미지 배경 CSS 추가) ----------------
 def set_custom_style(is_login=False):
     BG_COLOR = "#FAF8F1"        
     CARD_COLOR = "#F8F6F4"      
@@ -96,30 +73,24 @@ def set_custom_style(is_login=False):
     PRIMARY_COLOR = "#A1887F" 
     ACCENT_COLOR = "#795548"  
 
-    num_images = len(ENCODED_LOGIN_IMAGES)
+    num_images = len(LOGIN_IMAGES)
     image_keyframes = ""
-    
-    # Base64로 인코딩된 이미지 리스트 사용
     if is_login and num_images > 0:
         step = 100 / num_images
         keyframes_list = []
-        
-        for i, img_data in enumerate(ENCODED_LOGIN_IMAGES):
+        for i, img in enumerate(LOGIN_IMAGES):
             if i == 0:
-                # 0%와 100%는 첫 번째 이미지 (애니메이션 루프를 위해)
-                keyframes_list.append(f"0% {{ background-image: url('{img_data}'); }}")
-                keyframes_list.append(f"100% {{ background-image: url('{ENCODED_LOGIN_IMAGES[0]}'); }}")
+                keyframes_list.append(f"0% {{ background-image: url('{img}'); }}")
+                keyframes_list.append(f"100% {{ background-image: url('{LOGIN_IMAGES[0]}'); }}")
             
             start_percent = i * step
             end_percent = (i + 1) * step
             
-            # 현재 이미지가 시작하고 유지되는 시점
-            keyframes_list.append(f"{start_percent:.1f}% {{ background-image: url('{img_data}'); }}")
+            keyframes_list.append(f"{start_percent:.1f}% {{ background-image: url('{img}'); }}")
             
-            # 다음 이미지로 전환
             if i < num_images - 1:
-                next_img_data = ENCODED_LOGIN_IMAGES[i + 1]
-                keyframes_list.append(f"{end_percent:.1f}% {{ background-image: url('{next_img_data}'); }}")
+                next_img = LOGIN_IMAGES[i + 1]
+                keyframes_list.append(f"{end_percent:.1f}% {{ background-image: url('{next_img}'); }}")
 
         image_keyframes = "\n".join(keyframes_list)
 
@@ -907,4 +878,3 @@ if __name__ == "__main__":
         show_main_app()
     else:
         show_login_page()
-
