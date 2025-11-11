@@ -102,7 +102,7 @@ def init_session_state():
     if 'applied_discount' not in st.session_state:
         st.session_state.applied_discount = {'type': None, 'amount': 0}
 
-# ----------------- 인증 및 사용자 관리 ------------------
+# ----------------- 유틸리티 함수 ------------------
 
 def login(email, password):
     """로그인 처리 (더미 로직)"""
@@ -113,6 +113,9 @@ def login(email, password):
         st.session_state.user['email'] = email
         st.session_state.user['nickname'] = email.split('@')[0]
         st.success(f"{st.session_state.user['nickname']}님, 환영합니다!")
+        # *********** 수정된 부분 시작: 로그인 성공 시 홈 화면으로 이동 ***********
+        st.session_state.current_page = "홈"
+        # *********** 수정된 부분 끝 ***********
         st.rerun()
     else:
         st.error("이메일과 비밀번호를 입력해주세요.")
@@ -137,6 +140,9 @@ def register(email, password, password_confirm):
         'coupon_count': WELCOME_DISCOUNT_COUNT # 신규 가입 혜택 쿠폰 지급
     }
     st.success(f"회원가입 완료! {WELCOME_DISCOUNT_COUNT}개의 10% 할인 쿠폰이 지급되었습니다.")
+    # *********** 수정된 부분 시작: 회원가입 성공 시 홈 화면으로 이동 ***********
+    st.session_state.current_page = "홈"
+    # *********** 수정된 부분 끝 ***********
     st.rerun()
     
 def logout():
@@ -152,6 +158,9 @@ def logout():
         'coupon_count': 0
     }
     st.info("로그아웃 되었습니다.")
+    # *********** 수정된 부분 시작: 로그아웃 후 홈 화면으로 이동 ***********
+    st.session_state.current_page = "홈"
+    # *********** 수정된 부분 끝 ***********
     st.rerun()
 
 # ----------------- UI 렌더링 함수 ------------------
@@ -362,37 +371,49 @@ def show_header():
             if st.button("로그아웃"):
                 logout()
         else:
+            # 로그인/가입 버튼 클릭 시 '로그인/가입' 페이지로 이동하도록 설정
             if st.button("로그인 / 가입"):
                 st.session_state.current_page = "로그인/가입"
+                st.rerun() # 페이지 이동을 위해 rerun 필요
     
     st.markdown("<hr/>", unsafe_allow_html=True) # 구분선
 
 def show_main_app():
     """메인 앱 콘텐츠 렌더링"""
     
-    show_header()
+    # *********** 원본 코드의 '로그인/가입' 페이지 처리 로직 유지 ***********
+    if st.session_state.auth_status == 'guest' and 'current_page' not in st.session_state:
+        st.session_state.current_page = "로그인/가입"
     
+    if 'current_page' not in st.session_state:
+        st.session_state.current_page = "홈"
+    
+    # 인증 페이지가 아닐 때만 헤더 표시
+    if st.session_state.current_page != "로그인/가입":
+        show_header()
+    # *********** 원본 코드의 '로그인/가입' 페이지 처리 로직 유지 끝 ***********
+
     if st.session_state.current_page == "홈":
         st.header("✨ 따뜻하고 맛있는 빵, 지금 만나보세요!")
         
         # ****************** 오늘의 추천 메뉴 및 이벤트 ******************
         st.subheader("📢 오늘의 혜택 & 추천 메뉴")
         
-        # 탭을 유지하되, 각 탭 내부에 expander를 사용하여 내용을 접을 수 있게 함
+        # 탭을 유지
         tab_event, tab_reco_jam, tab_reco_salt = st.tabs(["🎁 이벤트", "🥪 오늘의 추천: 잠봉 뵈르", "☕ 오늘의 추천: 아메리카노 & 소금빵"])
         
         with tab_event:
-            # st.expander를 추가하여 이미지를 접을 수 있게 함 (기본 펼쳐짐)
+            # st.expander를 추가하여 이미지를 접었다 폈다 할 수 있게 수정
             with st.expander("이벤트 상세 보기", expanded=True): 
                 st.image("event1.jpg", caption="앱 사용 인증샷으로 쿠키도 받고 디저트 세트도 받으세요!", use_column_width=True)
         
         with tab_reco_jam:
-            # st.expander를 추가하여 이미지를 접을 수 있게 함 (기본 펼쳐짐)
+            # st.expander를 추가하여 이미지를 접었다 폈다 할 수 있게 수정
             with st.expander("잠봉 뵈르 추천 보기", expanded=True):
                 st.image("poster2.jpg", caption="오늘의 든든한 점심 추천! 바삭한 바게트에 햄과 버터의 환상적인 조화!", use_column_width=True)
         
         with tab_reco_salt:
-            # st.expander를 추가하여 이미지를 접을 수 있게 함 (기본 펼쳐짐)
+            # st.expander를 추가하여 이미지를 접었다 폈다 할 수 있게 수정
             with st.expander("소금빵 세트 추천 보기", expanded=True):
                 st.image("poster1.jpg", caption="국민 조합! 짭짤 고소한 소금빵과 시원한 아메리카노 세트!", use_column_width=True)
         
@@ -464,8 +485,10 @@ def show_mypage():
     """마이페이지 (스탬프, 쿠폰, 주문 내역)"""
     if st.session_state.auth_status != 'logged_in':
         st.warning("로그인 후 이용 가능한 페이지입니다.")
+        # *********** 수정된 부분 시작: 로그인 필요 시 로그인 화면으로 이동 ***********
         st.session_state.current_page = "로그인/가입"
         st.rerun()
+        # *********** 수정된 부분 끝 ***********
         return
 
     st.header(f"👋 {st.session_state.user['nickname']}님의 마이페이지")
@@ -619,6 +642,10 @@ if __name__ == "__main__":
     
     # 탭 네비게이션을 위해 초기 페이지 설정
     if 'current_page' not in st.session_state:
-        st.session_state.current_page = "홈"
+        # 로그인 상태가 'guest'이면 '로그인/가입' 페이지로 시작
+        if st.session_state.auth_status == 'guest':
+            st.session_state.current_page = "로그인/가입"
+        else:
+            st.session_state.current_page = "홈"
     
     show_main_app()
