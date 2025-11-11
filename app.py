@@ -15,12 +15,10 @@ SHOP_NAME = st.secrets.get("SHOP_NAME", "Lucy Bakery")
 OWNER_EMAIL_PRIMARY = st.secrets.get("OWNER_EMAIL_PRIMARY", "owner@example.com") # 사장님 이메일 (주문 알림용)
 
 # ****************** 쿠폰 및 리워드 설정 ******************
-# 10% 할인 쿠폰 설정 (2만원 이상 구매 시)
 MIN_DISCOUNT_PURCHASE = 20000 # 10% 할인 쿠폰 적용을 위한 최소 구매 금액 (20,000원)
 DISCOUNT_RATE = 0.1           # 10% 할인율
 WELCOME_DISCOUNT_COUNT = 1    # 신규 가입 시 지급하는 10% 쿠폰 개수
 
-# 스탬프 리워드 설정 (금액 쿠폰)
 AMERICANO_PRICE = 4000        # 아메리카노 기준 가격
 STAMP_REWARD_AMOUNT = AMERICANO_PRICE # 스탬프 10개 달성 시 지급할 쿠폰 금액 (4,000원)
 STAMP_GOAL = 10               # 아메리카노 리워드 목표 스탬프 수
@@ -35,6 +33,15 @@ TAG_BONUS_SCORE = 5 # 선택 태그 일치 메뉴에 부여할 가산점
 
 # JSON 파일 경로 설정
 DATA_FILE = "user_data.json"
+
+# ****************** 이미지 경로 설정 ******************
+LOGIN_IMAGES = [
+    "poster2.jpg", 
+    "event1.jpg",   
+    "poster1.jpg"   
+]
+# *****************************************************
+
 
 # ---------------- JSON 유틸리티 함수 (데이터 영속성) ----------------
 
@@ -58,36 +65,96 @@ def save_user_data(data):
     with open(DATA_FILE, "w", encoding="utf-8") as f:
         json.dump(data, f, indent=4, ensure_ascii=False)
 
-# ---------------- 디자인 테마 적용 ----------------
-def set_custom_style():
-    BG_COLOR = "#FAF8F1"        # Light Creamy Beige (Main Background)
-    CARD_COLOR = "#F8F6F4"      # Slightly darker cream (Input/Container Background)
-    TEXT_COLOR = "#3E2723"      # Dark Espresso Brown
-    PRIMARY_COLOR = "#A1887F" # Muted Brown / Taupe (Secondary Buttons, Borders)
-    ACCENT_COLOR = "#795548"  # Medium Brown (Primary Buttons, Highlights)
+# ---------------- 디자인 테마 적용 (이미지 배경 CSS 추가) ----------------
+def set_custom_style(is_login=False):
+    BG_COLOR = "#FAF8F1"        
+    CARD_COLOR = "#F8F6F4"      
+    TEXT_COLOR = "#3E2723"      
+    PRIMARY_COLOR = "#A1887F" 
+    ACCENT_COLOR = "#795548"  
 
-    css = f"""
-    <style>
-    /* 1. Main Background and Text */
+    num_images = len(LOGIN_IMAGES)
+    image_keyframes = ""
+    if is_login and num_images > 0:
+        step = 100 / num_images
+        keyframes_list = []
+        for i, img in enumerate(LOGIN_IMAGES):
+            if i == 0:
+                keyframes_list.append(f"0% {{ background-image: url('{img}'); }}")
+                keyframes_list.append(f"100% {{ background-image: url('{LOGIN_IMAGES[0]}'); }}")
+            
+            start_percent = i * step
+            end_percent = (i + 1) * step
+            
+            keyframes_list.append(f"{start_percent:.1f}% {{ background-image: url('{img}'); }}")
+            
+            if i < num_images - 1:
+                next_img = LOGIN_IMAGES[i + 1]
+                keyframes_list.append(f"{end_percent:.1f}% {{ background-image: url('{next_img}'); }}")
+
+        image_keyframes = "\n".join(keyframes_list)
+
+    # 로그인 페이지에만 배경 이미지를 적용하는 CSS
+    login_css = ""
+    if is_login and num_images > 0:
+        login_css = f"""
+        @keyframes imageAnimation {{
+            {image_keyframes}
+        }}
+
+        .stApp > header, .stApp > footer {{
+            background: none !important;
+        }}
+        .stApp {{
+            background-color: {BG_COLOR};
+            animation: imageAnimation {num_images * 5}s infinite ease-in-out;
+            background-size: cover;
+            background-position: center;
+            background-repeat: no-repeat;
+            transition: background-image 1s ease-in-out;
+        }}
+        .main .block-container {{
+            background: none;
+            padding-top: 2rem;
+        }}
+        
+        div[data-testid="stForm"] {{
+            background-color: {CARD_COLOR}D0;
+            padding: 30px;
+            border-radius: 15px;
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
+            backdrop-filter: blur(5px);
+            margin: 0 auto;
+            max-width: 450px;
+        }}
+        .stApp h1, .stApp h2, .stApp h3, .stApp .stMarkdown, .stApp .stText, .stApp .stLabel {{
+            color: {TEXT_COLOR} !important;
+            text-shadow: 1px 1px 2px rgba(255, 255, 255, 0.5);
+        }}
+        """
+
+    # 일반 앱 페이지의 CSS
+    app_css = f"""
     .stApp {{
         background-color: {BG_COLOR};
         color: {TEXT_COLOR};
         font-family: 'Malgun Gothic', 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
     }}
-    
-    /* 2. Headers and Titles */
-    h1, h2, h3, h4, h5, h6, .stMarkdown, .stText, .stLabel {{
-        color: {TEXT_COLOR} !important;
-        font-family: inherit;
-    }}
-    
-    /* 3. Main Streamlit Containers & Cards */
     .block-container {{
         background-color: {BG_COLOR};
         padding-top: 2rem;
     }}
+    """
     
-    /* 4. Input Fields, Select Boxes, Radio, Slider */
+    # 공통 CSS
+    common_css = f"""
+    <style>
+    {app_css if not is_login else login_css}
+    
+    h1, h2, h3, h4, h5, h6, .stMarkdown, .stText, .stLabel {{
+        color: {TEXT_COLOR} !important;
+        font-family: inherit;
+    }}
     div[data-testid="stTextInput"] > div:first-child, 
     div[data-testid="stNumberInput"] > div:first-child, 
     div[data-testid="stSelectbox"] > div:first-child, 
@@ -96,12 +163,10 @@ def set_custom_style():
         background-color: {CARD_COLOR}; 
         border-radius: 12px;
         padding: 10px;
-        border: 1px solid {PRIMARY_COLOR}30; /* Light border */
+        border: 1px solid {PRIMARY_COLOR}30;
         box-shadow: 1px 1px 3px rgba(0, 0, 0, 0.05);
     }}
-    div[data-testid="stRadio"] label {{ padding: 5px 0; }} /* Radio vertical padding */
-
-    /* 5. Buttons - Premium Look */
+    div[data-testid="stRadio"] label {{ padding: 5px 0; }}
     .stButton > button {{
         background-color: {PRIMARY_COLOR};
         color: white;
@@ -117,16 +182,12 @@ def set_custom_style():
         box-shadow: 3px 3px 8px rgba(0, 0, 0, 0.25);
         transform: translateY(-1px);
     }}
-
-    /* Primary Buttons (AI 추천, 로그인/가입, 주문 완료) - Darker Brown */
     .stButton button[data-testid*="primary"] {{
         background-color: {ACCENT_COLOR};
     }}
     .stButton button[data-testid*="primary"]:hover {{
-        background-color: #BCAAA4; /* Lighter brown for hover */
+        background-color: #BCAAA4;
     }}
-
-    /* 6. Info/Success/Warning Boxes for better integration */
     div[data-testid="stAlert"] {{
         border-left: 5px solid {ACCENT_COLOR};
         background-color: {CARD_COLOR};
@@ -134,10 +195,8 @@ def set_custom_style():
         border-radius: 12px;
         box-shadow: 1px 1px 5px rgba(0, 0, 0, 0.1);
     }}
-    
-    /* 7. Tabs Styling */
     .stTabs [data-baseweb="tab-list"] {{
-        gap: 15px; /* Spacing between tabs */
+        gap: 15px;
         border-bottom: 2px solid {PRIMARY_COLOR}50;
     }}
     .stTabs [data-baseweb="tab"] {{
@@ -150,25 +209,20 @@ def set_custom_style():
         transition: all 0.2s ease;
     }}
     .stTabs [aria-selected="true"] {{
-        background-color: {CARD_COLOR}; /* Active tab background */
+        background-color: {CARD_COLOR};
         color: {TEXT_COLOR} !important;
         border-bottom: 3px solid {ACCENT_COLOR} !important;
         box-shadow: 0 -2px 5px rgba(0, 0, 0, 0.05);
     }}
-    
-    /* 8. Item Caption (Tags) Color */
     .stMarkdown caption {{
         color: {PRIMARY_COLOR} !important;
     }}
-    
-    /* 9. Divider */
     hr {{
         border-top: 1px solid {PRIMARY_COLOR}50;
     }}
-    
     </style>
     """
-    st.markdown(css, unsafe_allow_html=True)
+    st.markdown(common_css, unsafe_allow_html=True)
 
 
 # ---------------- 유틸 ----------------
@@ -297,76 +351,78 @@ if "users_db" not in st.session_state: st.session_state.users_db = load_user_dat
 
 # ---------------- 로그인 페이지 ----------------
 def show_login_page():
-    set_custom_style()
-    st.title(f"🥐 {SHOP_NAME}")
-    st.header("휴대폰 번호 뒷자리로 로그인/회원가입")
+    # 로그인 페이지에만 배경 이미지 적용
+    set_custom_style(is_login=True)
+    
+    # 로그인 폼을 중앙에 배치하기 위해 컬럼 사용
+    c_left, c_center, c_right = st.columns([1, 2, 1])
 
-    with st.form("login_form"):
-        phone_suffix = st.text_input("휴대폰 번호 뒷 4자리", max_chars=4, placeholder="0000")
-        password = st.text_input("비밀번호 (6자리)", type="password", max_chars=6, placeholder="******")
+    with c_center:
+        st.markdown(f"**<h1 style='text-align: center; margin-top: 15vh;'>🥐 {SHOP_NAME}</h1>**", unsafe_allow_html=True)
+        st.header("휴대폰 번호 뒷자리로 로그인/회원가입")
 
-        submitted = st.form_submit_button("로그인 / 가입", type="primary")
+        with st.form("login_form"):
+            phone_suffix = st.text_input("휴대폰 번호 뒷 4자리", max_chars=4, placeholder="0000")
+            password = st.text_input("비밀번호 (6자리)", type="password", max_chars=6, placeholder="******")
 
-        if submitted:
-            phone_suffix = phone_suffix.strip()
-            password = password.strip()
+            submitted = st.form_submit_button("로그인 / 가입", type="primary", use_container_width=True)
 
-            if not (re.fullmatch(r'\d{4}', phone_suffix) and re.fullmatch(r'\d{6}', password)):
-                st.error("휴대폰 번호 뒷 4자리와 비밀번호 6자리를 정확히 입력해주세요.")
-                return
+            if submitted:
+                phone_suffix = phone_suffix.strip()
+                password = password.strip()
 
-            if phone_suffix in st.session_state.users_db:
-                # 기존 사용자 로그인
-                user_data = st.session_state.users_db[phone_suffix]
-                
-                if user_data["pass"] == password:
-                    # 데이터 누락 방지를 위해 setdefault 사용
-                    user_data.setdefault("stamps", 0)
-                    user_data.setdefault("coupon_count", 0) # 10% 쿠폰 개수
-                    user_data.setdefault("coupon_amount", 0) # 금액 쿠폰 잔액 (스탬프 리워드용)
-                    user_data.setdefault("orders", [])
+                if not (re.fullmatch(r'\d{4}', phone_suffix) and re.fullmatch(r'\d{6}', password)):
+                    st.error("휴대폰 번호 뒷 4자리와 비밀번호 6자리를 정확히 입력해주세요.")
+                    return
+
+                if phone_suffix in st.session_state.users_db:
+                    # 기존 사용자 로그인
+                    user_data = st.session_state.users_db[phone_suffix]
                     
-                    # NOTE: 이전 필드 제거 (호환성을 위해 이전 'coupon' 필드가 있다면 제거)
-                    user_data.pop("coupon", None) 
+                    if user_data["pass"] == password:
+                        user_data.setdefault("stamps", 0)
+                        user_data.pop("coupon", None) 
+                        user_data.setdefault("coupon_count", 0) 
+                        user_data.setdefault("coupon_amount", 0)
+                        user_data.setdefault("orders", [])
 
+                        st.session_state.logged_in = True
+                        st.session_state.user = {
+                            "name": f"고객({phone_suffix})",
+                            "phone": phone_suffix,
+                            "coupon_count": user_data["coupon_count"], 
+                            "coupon_amount": user_data["coupon_amount"],
+                            "stamps": user_data["stamps"],
+                            "orders": user_data["orders"]
+                        }
+                        st.success(f"{st.session_state.user['name']}님, 로그인되었습니다.")
+                        st.rerun()
+                    else:
+                        st.error("비밀번호가 일치하지 않습니다.")
+                else:
+                    # 신규 가입
+                    st.session_state.users_db[phone_suffix] = {
+                        "pass": password,
+                        "coupon_count": WELCOME_DISCOUNT_COUNT, 
+                        "coupon_amount": 0, 
+                        "stamps": 0,
+                        "orders": []
+                    }
                     st.session_state.logged_in = True
                     st.session_state.user = {
                         "name": f"고객({phone_suffix})",
                         "phone": phone_suffix,
-                        "coupon_count": user_data["coupon_count"], 
-                        "coupon_amount": user_data["coupon_amount"], # 금액 쿠폰 잔액 로드
-                        "stamps": user_data["stamps"],
-                        "orders": user_data["orders"]
+                        "coupon_count": WELCOME_DISCOUNT_COUNT, 
+                        "coupon_amount": 0,
+                        "stamps": 0,
+                        "orders": []
                     }
-                    st.success(f"{st.session_state.user['name']}님, 로그인되었습니다.")
+                    st.success(f"회원가입이 완료되었으며, **10% 할인 쿠폰 1개**가 지급되었습니다!")
+                    st.balloons()
+                    
+                    save_user_data(st.session_state.users_db)
+                    
                     st.rerun()
-                else:
-                    st.error("비밀번호가 일치하지 않습니다.")
-            else:
-                # 신규 가입
-                st.session_state.users_db[phone_suffix] = {
-                    "pass": password,
-                    "coupon_count": WELCOME_DISCOUNT_COUNT, # 신규 가입 시 10% 쿠폰 1개 지급
-                    "coupon_amount": 0, # 금액 쿠폰 잔액 0원
-                    "stamps": 0,
-                    "orders": []
-                }
-                st.session_state.logged_in = True
-                st.session_state.user = {
-                    "name": f"고객({phone_suffix})",
-                    "phone": phone_suffix,
-                    "coupon_count": WELCOME_DISCOUNT_COUNT, 
-                    "coupon_amount": 0,
-                    "stamps": 0,
-                    "orders": []
-                }
-                st.success(f"회원가입이 완료되었으며, **10% 할인 쿠폰 1개**가 지급되었습니다!")
-                st.balloons()
-                
-                # 신규 가입 후 데이터 저장
-                save_user_data(st.session_state.users_db)
-                
-                st.rerun()
 
 # ---------------- 장바구니 추가 헬퍼 ----------------
 def add_item_to_cart(item, qty=1):
@@ -418,8 +474,8 @@ def process_order_completion(phone_suffix, order_id, df_cart, total, final_total
         "items": df_cart[["name", "qty", "unit_price"]].to_dict("records"),
         "total": int(total),
         "final_total": int(final_total),
-        "discount_type": discount_type, # 사용된 할인 유형 (None, Amount, Rate)
-        "discount_amount": int(discount_amount), # 사용된 총 할인 금액
+        "discount_type": discount_type, 
+        "discount_amount": int(discount_amount), 
         "stamps_earned": 1 
     }
     st.session_state.users_db[phone_suffix]['orders'].insert(0, order_history_item)
@@ -427,12 +483,10 @@ def process_order_completion(phone_suffix, order_id, df_cart, total, final_total
 
     # 2. 쿠폰 사용 처리 (차감)
     if discount_type == "Amount":
-        # 금액 쿠폰 사용: 금액 차감
         st.session_state.user['coupon_amount'] -= discount_amount
         st.session_state.users_db[phone_suffix]['coupon_amount'] -= discount_amount
         st.toast(f"금액 쿠폰 {money(discount_amount)}이(가) 사용되었습니다.", icon="💳")
     elif discount_type == "Rate":
-        # 10% 할인 쿠폰 사용: 개수 차감
         st.session_state.user['coupon_count'] -= 1
         st.session_state.users_db[phone_suffix]['coupon_count'] -= 1
         st.toast("10% 할인 쿠폰 1개가 사용되었습니다.", icon="💳")
@@ -443,15 +497,13 @@ def process_order_completion(phone_suffix, order_id, df_cart, total, final_total
     
     st.toast(f"주문이 완료되어 스탬프 1개가 적립되었습니다! ❤️", icon="🎉")
 
-    # 4. 스탬프 목표 달성 확인 및 리워드 지급 (아메리카노 증정 = 금액 쿠폰 지급)
+    # 4. 스탬프 목표 달성 확인 및 리워드 지급
     current_stamps = st.session_state.user['stamps']
     
     if current_stamps >= STAMP_GOAL:
-        # 리워드 지급: 금액 쿠폰 잔액 증가
         st.session_state.user['coupon_amount'] += STAMP_REWARD_AMOUNT
         st.session_state.users_db[phone_suffix]['coupon_amount'] += STAMP_REWARD_AMOUNT
         
-        # 스탬프 리셋 (남은 스탬프 유지)
         st.session_state.user['stamps'] = current_stamps - STAMP_GOAL
         st.session_state.users_db[phone_suffix]['stamps'] = current_stamps - STAMP_GOAL
         
@@ -467,14 +519,13 @@ def process_order_completion(phone_suffix, order_id, df_cart, total, final_total
 
 # ---------------- 메인 앱 페이지 ----------------
 def show_main_app():
-    set_custom_style()
+    set_custom_style(is_login=False) 
     st.title("🥐 AI 베이커리 추천·주문")
 
     c_user, c_coupon, c_logout = st.columns([4, 4, 2])
     with c_user:
         st.success(f"**{st.session_state.user.get('name', '고객')}**님, 환영합니다!")
     with c_coupon:
-        # 쿠폰 현황을 간략히 표시
         amount = st.session_state.user.get('coupon_amount', 0)
         count = st.session_state.user.get('coupon_count', 0)
         st.info(f"금액 쿠폰: **{money(amount)}** | 10% 쿠폰: **{count}개**")
@@ -490,12 +541,28 @@ def show_main_app():
             st.rerun()
 
     st.markdown("---")
+    
+    # ****************** 오늘의 추천 메뉴 및 이벤트 ******************
+    st.subheader("📢 오늘의 혜택 & 추천 메뉴")
+    tab_event, tab_reco_jam, tab_reco_salt = st.tabs(["🎁 이벤트", "🥪 오늘의 추천: 잠봉 뵈르", "☕ 오늘의 추천: 아메리카노 & 소금빵"])
+    
+    with tab_event:
+        st.image("event1.jpg", caption="앱 사용 인증샷으로 쿠키도 받고 디저트 세트도 받으세요!", use_column_width=True)
+    
+    with tab_reco_jam:
+        st.image("poster2.jpg", caption="오늘의 든든한 점심 추천! 바삭한 바게트에 햄과 버터의 환상적인 조화!", use_column_width=True)
+    
+    with tab_reco_salt:
+        st.image("poster1.jpg", caption="국민 조합! 짭짤 고소한 소금빵과 시원한 아메리카노 세트!", use_column_width=True)
+    
+    st.markdown("---")
+    # *************************************************************************
+
 
     # ---------------- 탭 ----------------
     tab_reco, tab_menu, tab_cart, tab_history = st.tabs(["🤖 AI 메뉴 추천", "📋 메뉴판", "🛍️ 장바구니", "❤️ 스탬프 & 내역"])
 
-    # (이전과 동일한 추천 로직: tab_reco, tab_menu 생략)
-    # ... (추천 로직: tab_reco)
+    # ===== 추천 로직 =====
     with tab_reco:
         st.header("AI 맞춤형 메뉴 추천")
 
@@ -532,8 +599,7 @@ def show_main_app():
                         st.error("총 예산이 0원 이하입니다. 예산을 높이거나 '무제한'을 선택해주세요.")
                         st.session_state.reco_results = []
                         st.session_state.is_reco_fallback = False
-                        # return
-                    
+                        
                 else:
                     max_budget = float('inf') 
 
@@ -605,7 +671,7 @@ def show_main_app():
                 st.markdown("---")
 
 
-    # ... (메뉴판 로직: tab_menu)
+    # ===== 메뉴판 (주문 가능) =====
     with tab_menu:
         st.header("📋 전체 메뉴판")
 
@@ -680,8 +746,8 @@ def show_main_app():
             coupon_amount = st.session_state.user.get('coupon_amount', 0)
             coupon_count = st.session_state.user.get('coupon_count', 0)
             
-            discount_type = None # 적용된 할인 유형 (None, Amount, Rate)
-            discount_amount = 0  # 적용된 할인 금액
+            discount_type = None
+            discount_amount = 0
 
             st.markdown(f"""
                 <div style='padding: 10px; border: 1px solid #A1887F50; border-radius: 8px; margin-bottom: 15px;'>
@@ -700,11 +766,10 @@ def show_main_app():
             if coupon_count > 0:
                 options.append(f"10% 할인 쿠폰 사용 (2만원 이상 구매 시)")
             
-            coupon_selection = st.radio("사용할 쿠폰 선택", options, index=0)
+            coupon_selection = st.radio("사용할 쿠폰 선택", options, index=0, key="coupon_choice")
 
             # 2. 선택에 따른 할인 계산
             if "금액 쿠폰" in coupon_selection:
-                # 금액 쿠폰은 총액 내에서 사용 가능
                 max_use = min(coupon_amount, total)
                 applied_amount = st.slider(
                     f"사용할 금액 (최대 {money(max_use)})", 
@@ -715,12 +780,16 @@ def show_main_app():
                 discount_amount = applied_amount
 
             elif "10% 할인 쿠폰" in coupon_selection:
-                if total >= MIN_DISCOUNT_PURCHASE:
-                    discount_amount = int(total * DISCOUNT_RATE)
-                    st.success(f"10% 할인 적용! 총 {money(discount_amount)}이 할인됩니다.")
-                    discount_type = "Rate"
+                if coupon_count > 0:
+                    if total >= MIN_DISCOUNT_PURCHASE:
+                        discount_amount = int(total * DISCOUNT_RATE)
+                        st.success(f"10% 할인 적용! 총 {money(discount_amount)}이 할인됩니다.")
+                        discount_type = "Rate"
+                    else:
+                        st.warning(f"10% 할인 쿠폰은 **{money(MIN_DISCOUNT_PURCHASE)} 이상** 구매 시에만 적용됩니다. (현재 금액: {money(total)})")
+                        discount_type = None
+                        discount_amount = 0
                 else:
-                    st.warning(f"10% 할인 쿠폰은 **{money(MIN_DISCOUNT_PURCHASE)} 이상** 구매 시에만 적용됩니다. (현재 금액: {money(total)})")
                     discount_type = None
                     discount_amount = 0
             
@@ -752,7 +821,7 @@ def show_main_app():
                     
                     process_order_completion(
                         phone_suffix, oid, df_cart, total, final_total, 
-                        discount_type, discount_amount # 할인 정보 전달
+                        discount_type, discount_amount 
                     )
                 else:
                     st.error(f"주문 알림 이메일 전송에 실패했습니다: {err}. 관리자에게 문의해주세요.")
@@ -791,7 +860,6 @@ def show_main_app():
             st.info("아직 주문 내역이 없습니다. 지금 첫 주문을 완료하고 스탬프를 적립하세요!")
         else:
             for order in orders:
-                # 주문 내역은 최신순으로 표시
                 discount_info = f"할인: - {money(order['discount_amount'])} ({order['discount_type'] if order['discount_type'] else '없음'})"
                 
                 with st.expander(f"**[{order['date'].split(' ')[0]}]** 주문번호 #{order['id']} | 최종 결제: **{money(order['final_total'])}**", expanded=False):
