@@ -57,11 +57,11 @@ def save_user_data(data):
 
 # ---------------- 디자인 테마 적용 ----------------
 def set_custom_style():
-    BG_COLOR = "#FAF8F1"       # Light Creamy Beige (Main Background)
-    CARD_COLOR = "#F8F6F4"     # Slightly darker cream (Input/Container Background)
-    TEXT_COLOR = "#3E2723"     # Dark Espresso Brown
+    BG_COLOR = "#FAF8F1"        # Light Creamy Beige (Main Background)
+    CARD_COLOR = "#F8F6F4"      # Slightly darker cream (Input/Container Background)
+    TEXT_COLOR = "#3E2723"      # Dark Espresso Brown
     PRIMARY_COLOR = "#A1887F" # Muted Brown / Taupe (Secondary Buttons, Borders)
-    ACCENT_COLOR = "#795548"  # Medium Brown (Primary Buttons, Highlights)
+    ACCENT_COLOR = "#795548"  # Medium Brown (Primary Buttons, Highlights)
 
     css = f"""
     <style>
@@ -71,26 +71,26 @@ def set_custom_style():
         color: {TEXT_COLOR};
         font-family: 'Malgun Gothic', 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
     }}
-        
+    
     /* 2. Headers and Titles */
     h1, h2, h3, h4, h5, h6, .stMarkdown, .stText, .stLabel {{
         color: {TEXT_COLOR} !important;
         font-family: inherit;
     }}
-        
+    
     /* 3. Main Streamlit Containers & Cards */
     .block-container {{
         background-color: {BG_COLOR};
         padding-top: 2rem;
     }}
-        
+    
     /* 4. Input Fields, Select Boxes, Radio, Slider */
-    div[data-testid="stTextInput"] > div:first-child, 
-    div[data-testid="stNumberInput"] > div:first-child, 
-    div[data-testid="stSelectbox"] > div:first-child, 
+    div[data-testid="stTextInput"] > div:first-child, 
+    div[data-testid="stNumberInput"] > div:first-child, 
+    div[data-testid="stSelectbox"] > div:first-child, 
     div[data-testid="stMultiSelect"] > div:first-child,
     div[data-testid="stRadio"], div[data-testid="stSlider"] {{
-        background-color: {CARD_COLOR}; 
+        background-color: {CARD_COLOR}; 
         border-radius: 12px;
         padding: 10px;
         border: 1px solid {PRIMARY_COLOR}30; /* Light border */
@@ -131,7 +131,7 @@ def set_custom_style():
         border-radius: 12px;
         box-shadow: 1px 1px 5px rgba(0, 0, 0, 0.1);
     }}
-        
+    
     /* 7. Tabs Styling */
     .stTabs [data-baseweb="tab-list"] {{
         gap: 15px; /* Spacing between tabs */
@@ -152,17 +152,17 @@ def set_custom_style():
         border-bottom: 3px solid {ACCENT_COLOR} !important;
         box-shadow: 0 -2px 5px rgba(0, 0, 0, 0.05);
     }}
-        
+    
     /* 8. Item Caption (Tags) Color */
     .stMarkdown caption {{
         color: {PRIMARY_COLOR} !important;
     }}
-        
+    
     /* 9. Divider */
     hr {{
         border-top: 1px solid {PRIMARY_COLOR}50;
     }}
-        
+    
     </style>
     """
     st.markdown(css, unsafe_allow_html=True)
@@ -266,9 +266,9 @@ def load_menu_data():
             "tags": ["바삭,인기", "짭짤", "달콤", "커피,달콤", "고소"]
         }
         bakery_df = normalize_columns(pd.DataFrame(dummy_bakery), is_drink=False)
-       
+    
     try:
-        drink_df  = normalize_columns(pd.read_csv("Drink_menu.csv"), is_drink=True)
+        drink_df  = normalize_columns(pd.read_csv("Drink_menu.csv"), is_drink=True)
     except FileNotFoundError:
         st.warning("Drink_menu.csv 파일을 찾을 수 없습니다. 더미 데이터를 사용합니다.")
         dummy_drink = {
@@ -293,7 +293,7 @@ if "cart" not in st.session_state: st.session_state.cart = []
 if "reco_results" not in st.session_state: st.session_state.reco_results = []
 if "is_reco_fallback" not in st.session_state: st.session_state.is_reco_fallback = False
 # 임시 사용자 데이터베이스: key는 '폰뒷4자리', value는 {pass:비밀번호, coupon:쿠폰액, stamps:스탬프 수, orders:주문내역}
-# 🔥 JSON 파일에서 데이터 로드 🔥
+# JSON 파일에서 데이터 로드
 if "users_db" not in st.session_state: st.session_state.users_db = load_user_data()
 
 # ---------------- 로그인 페이지 ----------------
@@ -319,7 +319,7 @@ def show_login_page():
             if phone_suffix in st.session_state.users_db:
                 # 기존 사용자 로그인 및 데이터 로드 (스탬프/쿠폰 유지)
                 user_data = st.session_state.users_db[phone_suffix]
-                 
+                
                 if user_data["pass"] == password:
                     # 데이터 누락 방지를 위해 setdefault 사용
                     user_data.setdefault("stamps", 0)
@@ -332,7 +332,7 @@ def show_login_page():
                         "phone": phone_suffix,
                         "coupon": user_data["coupon"], # 기존 쿠폰액 로드
                         "stamps": user_data["stamps"], # 기존 스탬프 수 로드
-                        "orders": user_data["orders"]  # 기존 주문 내역 로드
+                        "orders": user_data["orders"]  # 기존 주문 내역 로드
                     }
                     st.success(f"{st.session_state.user['name']}님, 로그인되었습니다.")
                     st.rerun()
@@ -357,7 +357,7 @@ def show_login_page():
                 st.success(f"회원가입이 완료되었으며, {money(WELCOME_COUPON_AMOUNT)} 쿠폰이 지급되었습니다!")
                 st.balloons()
                 
-                # 🔥 신규 가입 후 데이터 저장 🔥
+                # 신규 가입 후 데이터 저장
                 save_user_data(st.session_state.users_db)
                 
                 st.rerun()
@@ -366,8 +366,8 @@ def show_login_page():
 def add_item_to_cart(item, qty=1):
     """장바구니에 아이템을 추가하고 토스트 메시지를 표시합니다."""
     st.session_state.cart.append({
-        "item_id": item["item_id"], "name": item["name"], 
-        "type": item["type"], "category": item.get("category", ""), 
+        "item_id": item["item_id"], "name": item["name"], 
+        "type": item["type"], "category": item.get("category", ""), 
         "qty": qty, "unit_price": int(item["price"])
     })
     st.toast(f"**{item['name']}** {qty}개를 장바구니에 담았습니다. 🛒")
@@ -387,7 +387,7 @@ def find_combinations(drinks_df, bakery_df, n_people, n_bakery, max_budget):
 
     for d in drinks_to_use:
         # 음료 스코어는 기본 1 (이 부분은 변경 없음)
-        d_score = d.get("score", 1) 
+        d_score = d.get("score", 1) 
 
         for b_combo in combos:
             total_price = d["price"] * n_people + sum(b["price"] for b in b_combo)
@@ -397,9 +397,9 @@ def find_combinations(drinks_df, bakery_df, n_people, n_bakery, max_budget):
                 total_score = d_score + sum(b["score"] for b in b_combo)
 
                 found_results.append({
-                    "drink": d, 
-                    "bakery": b_combo, 
-                    "total": total_price, 
+                    "drink": d, 
+                    "bakery": b_combo, 
+                    "total": total_price, 
                     "score": total_score
                 })
     return found_results
@@ -407,7 +407,7 @@ def find_combinations(drinks_df, bakery_df, n_people, n_bakery, max_budget):
 # ---------------- 주문 완료 처리 ----------------
 def process_order_completion(phone_suffix, order_id, df_cart, total, final_total, coupon_used_amount):
     """주문 완료 후 스탬프 적립, 주문 내역 저장 및 쿠폰 발행을 처리합니다."""
-     
+    
     # 1. 주문 내역 저장
     order_history_item = {
         "id": order_id,
@@ -416,7 +416,7 @@ def process_order_completion(phone_suffix, order_id, df_cart, total, final_total
         "total": int(total),
         "final_total": int(final_total),
         "coupon_used": int(coupon_used_amount),
-        "stamps_earned": 1 
+        "stamps_earned": 1 
     }
     # users_db와 session_state.user에 모두 저장
     st.session_state.users_db[phone_suffix]['orders'].insert(0, order_history_item) # 최신순으로
@@ -431,25 +431,25 @@ def process_order_completion(phone_suffix, order_id, df_cart, total, final_total
     # 3. 스탬프 적립
     st.session_state.user['stamps'] += 1
     st.session_state.users_db[phone_suffix]['stamps'] += 1
-     
+    
     st.toast(f"주문이 완료되어 스탬프 1개가 적립되었습니다! ❤️", icon="🎉")
 
     # 4. 스탬프 목표 달성 확인 및 리워드 지급
     current_stamps = st.session_state.user['stamps']
-     
+    
     if current_stamps >= STAMP_GOAL:
         # 리워드 지급
         st.session_state.user['coupon'] += STAMP_REWARD_AMOUNT
         st.session_state.users_db[phone_suffix]['coupon'] += STAMP_REWARD_AMOUNT
-         
+        
         # 스탬프 리셋 (남은 스탬프 유지)
         st.session_state.user['stamps'] = current_stamps - STAMP_GOAL
         st.session_state.users_db[phone_suffix]['stamps'] = current_stamps - STAMP_GOAL
-         
+        
         st.balloons()
         st.success(f"🎉 **스탬프 {STAMP_GOAL}개 달성!** {money(STAMP_REWARD_AMOUNT)} 상당의 아메리카노 쿠폰이 추가 지급되었습니다.")
     
-    # 🔥 데이터 저장 🔥
+    # 데이터 저장
     save_user_data(st.session_state.users_db)
     
     # 5. 장바구니 비우고 새로고침
@@ -536,16 +536,16 @@ def show_main_app():
 
                 # --- Phase 1: 엄격한 조건 (선택 태그 모두 포함 및 점수 부스팅 적용) ---
                 bakery_strict = bakery_base.copy()
-                 
+                
                 if st.session_state.sel_tags and st.session_state.n_bakery > 0:
                     tagset = set(st.session_state.sel_tags)
-                     
+                    
                     # **필터링:** 선택된 태그 중 하나라도 포함하는 메뉴로 필터링 (조합의 수를 너무 줄이지 않기 위함)
                     bakery_strict = bakery_strict[bakery_strict["tags_list"].apply(lambda xs: not tagset.isdisjoint(set(xs)))]
-                     
+                    
                     # 2. **취향 가산점 부스팅**: 필터링된 메뉴 중 일치 태그 수만큼 점수를 크게 높여서 추천 순위 보장
                     bakery_strict["score"] = bakery_strict.apply(
-                        lambda row: row["score"] + (len(set(row["tags_list"]) & tagset) * TAG_BONUS_SCORE), 
+                        lambda row: row["score"] + (len(set(row["tags_list"]) & tagset) * TAG_BONUS_SCORE), 
                         axis=1
                     )
 
@@ -700,12 +700,12 @@ def show_main_app():
             # --- 쿠폰 적용 (개선) ---
             st.subheader("🎫 쿠폰함")
             coupon_amount = st.session_state.user.get('coupon', 0)
-             
+            
             if coupon_amount > 0:
                 max_use = min(coupon_amount, total)
                 coupon_used_amount = st.slider(
-                    f"사용할 쿠폰 금액 (보유: {money(coupon_amount)})", 
-                    0, max_use, 0, step=1000, 
+                    f"사용할 쿠폰 금액 (보유: {money(coupon_amount)})", 
+                    0, max_use, 0, step=1000, 
                     help=f"최대 {money(max_use)}까지 사용할 수 있습니다."
                 )
             else:
@@ -714,7 +714,7 @@ def show_main_app():
 
             discount = coupon_used_amount
             final_total = max(0, total - discount)
-             
+            
             st.markdown("---")
             st.subheader(f"총 주문 금액: {money(total)}")
             st.write(f"적용 할인 (쿠폰): - **{money(discount)}**")
@@ -724,7 +724,7 @@ def show_main_app():
 
             note = st.text_area("요청사항", height=50)
 
-             
+            
             # --- 주문 완료 버튼 ---
             if st.button("주문 완료 및 매장 알림", type="primary", use_container_width=True):
                 phone_suffix = st.session_state.user['phone']
@@ -732,14 +732,14 @@ def show_main_app():
 
                 # 1. 이메일 전송 (알림)
                 ok, err = send_order_email(
-                    [OWNER_EMAIL_PRIMARY], SHOP_NAME, oid, 
+                    [OWNER_EMAIL_PRIMARY], SHOP_NAME, oid, 
                     df_cart.to_dict("records"), final_total, note
                 )
-                 
+                
                 # 2. 주문 처리 및 스탬프/내역 업데이트
                 if ok:
                     st.success(f"주문번호 **#{oid}** 접수 완료. 최종 금액: {money(final_total)} (카운터 결제)")
-                     
+                    
                     # process_order_completion에서 rerun()을 호출하며, 쿠폰/스탬프 처리 및 장바구니 비우기 완료
                     process_order_completion(phone_suffix, oid, df_cart, total, final_total, coupon_used_amount)
                 else:
@@ -751,17 +751,17 @@ def show_main_app():
     # ===== 스탬프 & 주문 내역 =====
     with tab_history:
         st.header("❤️ 스탬프 & 주문 내역")
-         
+        
         # --- 스탬프 현황 ---
         current_stamps = st.session_state.user.get('stamps', 0)
         st.subheader("스탬프 적립 현황")
-         
+        
         # Custom display for stamps
         heart_display = "❤️" * current_stamps + "🤍" * max(0, STAMP_GOAL - current_stamps)
         st.markdown(f"""
             ### 현재 스탬프: {heart_display} ({current_stamps}/{STAMP_GOAL}개)
             다음 리워드까지 **{max(0, STAMP_GOAL - current_stamps)}**개 남았습니다.
-             
+            
             **🎁 리워드:** 스탬프 {STAMP_GOAL}개 달성 시 **{money(STAMP_REWARD_AMOUNT)}** 상당의 쿠폰 증정!
         """)
         st.markdown("---")
@@ -774,7 +774,7 @@ def show_main_app():
         # --- 주문 내역 ---
         st.subheader("최근 주문 내역")
         orders = st.session_state.user.get('orders', [])
-         
+        
         if not orders:
             st.info("아직 주문 내역이 없습니다. 지금 첫 주문을 완료하고 스탬프를 적립하세요!")
         else:
