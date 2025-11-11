@@ -28,8 +28,6 @@ STAMP_GOAL = 10 # 아메리카노 리워드 목표 스탬프 수
 
 # ---------------- 디자인 테마 적용 ----------------
 def set_custom_style():
-    """베이지/브라운 톤의 고급스러운 디자인을 Streamlit에 적용합니다."""
-    # Warm Beige/Brown Palette
     BG_COLOR = "#FAF8F1"      # Light Creamy Beige (Main Background)
     CARD_COLOR = "#F8F6F4"    # Slightly darker cream (Input/Container Background)
     TEXT_COLOR = "#3E2723"    # Dark Espresso Brown
