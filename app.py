@@ -54,7 +54,6 @@ def get_base64_image(image_file):
 
             return f"data:{mime_type};base64,{base64.b64encode(f.read()).decode()}"
     except FileNotFoundError:
-        # 파일이 없으면 오류 메시지를 띄우지만, 앱 실행은 계속합니다.
         print(f"경고: 배경 이미지 파일 '{image_file}'을 찾을 수 없습니다.")
         return None
 
@@ -577,7 +576,6 @@ def show_main_app():
     tab_event, tab_reco_jam, tab_reco_salt = st.tabs(["🎁 이벤트", "🥪 오늘의 추천: 잠봉 뵈르", "☕ 오늘의 추천: 아메리카노 & 소금빵"])
     
     with tab_event:
-        # GitHub에 올라간 이미지는 st.image로 로드 가능합니다.
         st.image("event1.jpg", caption="앱 사용 인증샷으로 쿠키도 받고 디저트 세트도 받으세요!", use_column_width=True)
     
     with tab_reco_jam:
@@ -837,8 +835,6 @@ def show_main_app():
             
             # --- 주문 완료 버튼 ---
             if st.button("주문 완료 및 매장 알림", type="primary", use_container_width=True):
-                # 'KeyError'는 이 코드 블록이 실행되기 전 상태 문제일 확률이 높음. 
-                # 상태 초기화 코드를 상단에 배치하여 안정화
                 phone_suffix = st.session_state.user['phone']
                 oid = f"O{datetime.now().strftime('%m%d%H%M%S')}"
 
