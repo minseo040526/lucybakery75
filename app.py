@@ -34,13 +34,17 @@ TAG_BONUS_SCORE = 5 # 선택 태그 일치 메뉴에 부여할 가산점
 # JSON 파일 경로 설정
 DATA_FILE = "user_data.json"
 
-# ****************** 이미지 경로 설정 ******************
+# ****************** 이미지 경로 설정 (새로 추가/수정) ******************
+# 업로드된 파일 이름을 사용하여 이미지 경로 목록을 만듭니다.
+# 주의: Streamlit Cloud 환경에서 파일 경로는 '/app/app_name/파일명' 형식일 수 있지만,
+# 현재 실행 환경에서는 직접 접근 가능한 경로를 사용합니다.
+# 임시 경로로 업로드된 파일을 저장했다고 가정하고, 로컬 환경에서 사용 시 파일명을 그대로 사용합니다.
 LOGIN_IMAGES = [
-    "poster2.jpg", 
-    "event1.jpg",   
-    "poster1.jpg"   
+    "poster2.jpg",  # Jambon Beurre
+    "event1.jpg",   # Instagram Event
+    "poster1.jpg"   # Americano & Salt Bread
 ]
-# *****************************************************
+# *******************************************************************
 
 
 # ---------------- JSON 유틸리티 함수 (데이터 영속성) ----------------
@@ -67,30 +71,39 @@ def save_user_data(data):
 
 # ---------------- 디자인 테마 적용 (이미지 배경 CSS 추가) ----------------
 def set_custom_style(is_login=False):
-    BG_COLOR = "#FAF8F1"        
-    CARD_COLOR = "#F8F6F4"      
-    TEXT_COLOR = "#3E2723"      
-    PRIMARY_COLOR = "#A1887F" 
-    ACCENT_COLOR = "#795548"  
+    BG_COLOR = "#FAF8F1"        # Light Creamy Beige (Main Background)
+    CARD_COLOR = "#F8F6F4"      # Slightly darker cream (Input/Container Background)
+    TEXT_COLOR = "#3E2723"      # Dark Espresso Brown
+    PRIMARY_COLOR = "#A1887F" # Muted Brown / Taupe (Secondary Buttons, Borders)
+    ACCENT_COLOR = "#795548"  # Medium Brown (Primary Buttons, Highlights)
 
+    # 이미지 경로를 기반으로 CSS 애니메이션의 키프레임을 생성합니다.
+    # 각 이미지는 100% / 이미지 개수만큼의 시간(%) 동안 표시됩니다.
     num_images = len(LOGIN_IMAGES)
-    image_keyframes = ""
-    if is_login and num_images > 0:
+    if num_images == 0:
+        image_keyframes = ""
+    else:
         step = 100 / num_images
         keyframes_list = []
         for i, img in enumerate(LOGIN_IMAGES):
+            # 0%와 100%는 첫 번째 이미지
             if i == 0:
                 keyframes_list.append(f"0% {{ background-image: url('{img}'); }}")
                 keyframes_list.append(f"100% {{ background-image: url('{LOGIN_IMAGES[0]}'); }}")
             
+            # 이미지가 시작하는 시점 (i * step)
             start_percent = i * step
+            # 이미지가 끝나는 시점 ((i + 1) * step)
             end_percent = (i + 1) * step
             
+            # 다음 이미지로 전환되기 직전까지 현재 이미지를 유지
             keyframes_list.append(f"{start_percent:.1f}% {{ background-image: url('{img}'); }}")
             
+            # 다음 이미지로 전환
             if i < num_images - 1:
                 next_img = LOGIN_IMAGES[i + 1]
                 keyframes_list.append(f"{end_percent:.1f}% {{ background-image: url('{next_img}'); }}")
+
 
         image_keyframes = "\n".join(keyframes_list)
 
@@ -102,24 +115,27 @@ def set_custom_style(is_login=False):
             {image_keyframes}
         }}
 
+        /* 로그인 페이지 배경을 이미지 슬라이드로 설정 */
         .stApp > header, .stApp > footer {{
             background: none !important;
         }}
         .stApp {{
             background-color: {BG_COLOR};
-            animation: imageAnimation {num_images * 5}s infinite ease-in-out;
+            animation: imageAnimation {num_images * 5}s infinite ease-in-out; /* N개 이미지 * 5초 */
             background-size: cover;
             background-position: center;
             background-repeat: no-repeat;
             transition: background-image 1s ease-in-out;
         }}
+        /* Streamlit main block container의 투명도를 높여 배경이 보이게 함 */
         .main .block-container {{
             background: none;
             padding-top: 2rem;
         }}
         
+        /* 로그인 폼 자체는 잘 보이도록 배경색 유지 및 투명도 조정 */
         div[data-testid="stForm"] {{
-            background-color: {CARD_COLOR}D0;
+            background-color: {CARD_COLOR}D0; /* D0는 80% 투명도 */
             padding: 30px;
             border-radius: 15px;
             box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
@@ -127,9 +143,10 @@ def set_custom_style(is_login=False):
             margin: 0 auto;
             max-width: 450px;
         }}
+        /* 제목과 텍스트가 잘 보이도록 강제 색상 적용 */
         .stApp h1, .stApp h2, .stApp h3, .stApp .stMarkdown, .stApp .stText, .stApp .stLabel {{
             color: {TEXT_COLOR} !important;
-            text-shadow: 1px 1px 2px rgba(255, 255, 255, 0.5);
+            text-shadow: 1px 1px 2px rgba(255, 255, 255, 0.5); /* 텍스트 가독성 향상 */
         }}
         """
 
@@ -349,11 +366,12 @@ if "is_reco_fallback" not in st.session_state: st.session_state.is_reco_fallback
 # JSON 파일에서 데이터 로드
 if "users_db" not in st.session_state: st.session_state.users_db = load_user_data()
 
-# ---------------- 로그인 페이지 ----------------
+# ---------------- 로그인 페이지 (수정) ----------------
 def show_login_page():
     # 로그인 페이지에만 배경 이미지 적용
     set_custom_style(is_login=True)
     
+    # 이미지가 적용되었으므로 st.title은 컨테이너 안에 넣습니다.
     # 로그인 폼을 중앙에 배치하기 위해 컬럼 사용
     c_left, c_center, c_right = st.columns([1, 2, 1])
 
@@ -474,8 +492,8 @@ def process_order_completion(phone_suffix, order_id, df_cart, total, final_total
         "items": df_cart[["name", "qty", "unit_price"]].to_dict("records"),
         "total": int(total),
         "final_total": int(final_total),
-        "discount_type": discount_type, 
-        "discount_amount": int(discount_amount), 
+        "discount_type": discount_type, # 사용된 할인 유형 (None, Amount, Rate)
+        "discount_amount": int(discount_amount), # 사용된 총 할인 금액
         "stamps_earned": 1 
     }
     st.session_state.users_db[phone_suffix]['orders'].insert(0, order_history_item)
@@ -483,10 +501,12 @@ def process_order_completion(phone_suffix, order_id, df_cart, total, final_total
 
     # 2. 쿠폰 사용 처리 (차감)
     if discount_type == "Amount":
+        # 금액 쿠폰 사용: 금액 차감
         st.session_state.user['coupon_amount'] -= discount_amount
         st.session_state.users_db[phone_suffix]['coupon_amount'] -= discount_amount
         st.toast(f"금액 쿠폰 {money(discount_amount)}이(가) 사용되었습니다.", icon="💳")
     elif discount_type == "Rate":
+        # 10% 할인 쿠폰 사용: 개수 차감
         st.session_state.user['coupon_count'] -= 1
         st.session_state.users_db[phone_suffix]['coupon_count'] -= 1
         st.toast("10% 할인 쿠폰 1개가 사용되었습니다.", icon="💳")
@@ -497,13 +517,15 @@ def process_order_completion(phone_suffix, order_id, df_cart, total, final_total
     
     st.toast(f"주문이 완료되어 스탬프 1개가 적립되었습니다! ❤️", icon="🎉")
 
-    # 4. 스탬프 목표 달성 확인 및 리워드 지급
+    # 4. 스탬프 목표 달성 확인 및 리워드 지급 (아메리카노 증정 = 금액 쿠폰 지급)
     current_stamps = st.session_state.user['stamps']
     
     if current_stamps >= STAMP_GOAL:
+        # 리워드 지급: 금액 쿠폰 잔액 증가
         st.session_state.user['coupon_amount'] += STAMP_REWARD_AMOUNT
         st.session_state.users_db[phone_suffix]['coupon_amount'] += STAMP_REWARD_AMOUNT
         
+        # 스탬프 리셋 (남은 스탬프 유지)
         st.session_state.user['stamps'] = current_stamps - STAMP_GOAL
         st.session_state.users_db[phone_suffix]['stamps'] = current_stamps - STAMP_GOAL
         
@@ -519,6 +541,7 @@ def process_order_completion(phone_suffix, order_id, df_cart, total, final_total
 
 # ---------------- 메인 앱 페이지 ----------------
 def show_main_app():
+    # 메인 페이지에는 일반 스타일 적용 (배경 이미지 없음)
     set_custom_style(is_login=False) 
     st.title("🥐 AI 베이커리 추천·주문")
 
@@ -541,23 +564,6 @@ def show_main_app():
             st.rerun()
 
     st.markdown("---")
-    
-    # ****************** 오늘의 추천 메뉴 및 이벤트 ******************
-    st.subheader("📢 오늘의 혜택 & 추천 메뉴")
-    tab_event, tab_reco_jam, tab_reco_salt = st.tabs(["🎁 이벤트", "🥪 오늘의 추천: 잠봉 뵈르", "☕ 오늘의 추천: 아메리카노 & 소금빵"])
-    
-    with tab_event:
-        st.image("event1.jpg", caption="앱 사용 인증샷으로 쿠키도 받고 디저트 세트도 받으세요!", use_column_width=True)
-    
-    with tab_reco_jam:
-        st.image("poster2.jpg", caption="오늘의 든든한 점심 추천! 바삭한 바게트에 햄과 버터의 환상적인 조화!", use_column_width=True)
-    
-    with tab_reco_salt:
-        st.image("poster1.jpg", caption="국민 조합! 짭짤 고소한 소금빵과 시원한 아메리카노 세트!", use_column_width=True)
-    
-    st.markdown("---")
-    # *************************************************************************
-
 
     # ---------------- 탭 ----------------
     tab_reco, tab_menu, tab_cart, tab_history = st.tabs(["🤖 AI 메뉴 추천", "📋 메뉴판", "🛍️ 장바구니", "❤️ 스탬프 & 내역"])
@@ -599,7 +605,8 @@ def show_main_app():
                         st.error("총 예산이 0원 이하입니다. 예산을 높이거나 '무제한'을 선택해주세요.")
                         st.session_state.reco_results = []
                         st.session_state.is_reco_fallback = False
-                        
+                        # return
+                    
                 else:
                     max_budget = float('inf') 
 
@@ -766,6 +773,7 @@ def show_main_app():
             if coupon_count > 0:
                 options.append(f"10% 할인 쿠폰 사용 (2만원 이상 구매 시)")
             
+            # 고유 키 추가
             coupon_selection = st.radio("사용할 쿠폰 선택", options, index=0, key="coupon_choice")
 
             # 2. 선택에 따른 할인 계산
@@ -780,16 +788,12 @@ def show_main_app():
                 discount_amount = applied_amount
 
             elif "10% 할인 쿠폰" in coupon_selection:
-                if coupon_count > 0:
-                    if total >= MIN_DISCOUNT_PURCHASE:
-                        discount_amount = int(total * DISCOUNT_RATE)
-                        st.success(f"10% 할인 적용! 총 {money(discount_amount)}이 할인됩니다.")
-                        discount_type = "Rate"
-                    else:
-                        st.warning(f"10% 할인 쿠폰은 **{money(MIN_DISCOUNT_PURCHASE)} 이상** 구매 시에만 적용됩니다. (현재 금액: {money(total)})")
-                        discount_type = None
-                        discount_amount = 0
+                if total >= MIN_DISCOUNT_PURCHASE:
+                    discount_amount = int(total * DISCOUNT_RATE)
+                    st.success(f"10% 할인 적용! 총 {money(discount_amount)}이 할인됩니다.")
+                    discount_type = "Rate"
                 else:
+                    st.warning(f"10% 할인 쿠폰은 **{money(MIN_DISCOUNT_PURCHASE)} 이상** 구매 시에만 적용됩니다. (현재 금액: {money(total)})")
                     discount_type = None
                     discount_amount = 0
             
@@ -845,36 +849,5 @@ def show_main_app():
         st.markdown("---")
 
         # --- 쿠폰 잔액 확인 ---
-        st.subheader("🎫 현재 쿠폰 잔액")
-        amount = st.session_state.user.get('coupon_amount', 0)
-        count = st.session_state.user.get('coupon_count', 0)
-        st.info(f"**💰 금액 쿠폰:** **{money(amount)}** (스탬프 리워드)\n\n"
-                f"**📉 10% 할인 쿠폰:** **{count}개** (신규 가입 혜택, 2만원 이상 구매 시)")
-        st.markdown("---")
-
-        # --- 주문 내역 ---
-        st.subheader("최근 주문 내역")
-        orders = st.session_state.user.get('orders', [])
-        
-        if not orders:
-            st.info("아직 주문 내역이 없습니다. 지금 첫 주문을 완료하고 스탬프를 적립하세요!")
-        else:
-            for order in orders:
-                discount_info = f"할인: - {money(order['discount_amount'])} ({order['discount_type'] if order['discount_type'] else '없음'})"
-                
-                with st.expander(f"**[{order['date'].split(' ')[0]}]** 주문번호 #{order['id']} | 최종 결제: **{money(order['final_total'])}**", expanded=False):
-                    st.markdown(f"**주문 시간:** {order['date']}")
-                    st.markdown(f"**총 금액:** {money(order['total'])}")
-                    st.markdown(f"**{discount_info}**")
-                    st.markdown(f"**적립 스탬프:** {order['stamps_earned']}개")
-                    st.markdown("---")
-                    st.markdown("**주문 상품 목록**")
-                    for item in order['items']:
-                        st.write(f"- {item['name']} x {item['qty']} ({money(item['unit_price'])}/개)")
-
-# ---------------- 메인 실행 ----------------
-if __name__ == "__main__":
-    if st.session_state.logged_in:
-        show_main_app()
-    else:
-        show_login_page()
+        st.subheader("🎫 보유 쿠폰")
+        amount = st.session_state
