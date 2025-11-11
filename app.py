@@ -873,11 +873,11 @@ def show_main_app():
         )
         st.markdown("---")
 
-        st.subheader("🎫 현재 쿠폰 잔액")
+        st.subheader("🎫 쿠폰함")
         amount = st.session_state.user.get("coupon_amount", 0)
         count = st.session_state.user.get("coupon_count", 0)
         st.info(
-            f"**💰 금액 쿠폰:** **{money(amount)}** (스탬프 리워드)\n\n"
+            f"**💰 아메리카노 쿠폰:** **{money(amount)}** (스탬프 리워드)\n\n"
             f"**📉 10% 할인 쿠폰:** **{count}개** (신규 가입 혜택, 2만원 이상 구매 시)"
         )
         st.markdown("---")
