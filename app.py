@@ -6,7 +6,7 @@ from email.utils import formatdate
 from datetime import datetime
 from PIL import Image
 import json 
-import base64 
+import base64 # <-- Base64 모듈 추가
 
 # ---------------- 기본 설정 ----------------
 st.set_page_config(page_title="AI 베이커리 추천·주문", layout="wide")
@@ -54,7 +54,7 @@ def get_base64_image(image_file):
 
             return f"data:{mime_type};base64,{base64.b64encode(f.read()).decode()}"
     except FileNotFoundError:
-        # print(f"경고: 배경 이미지 파일 '{image_file}'을 찾을 수 없습니다.") # 로그 제거 (streamlit 자체 로그 방지)
+        print(f"경고: 배경 이미지 파일 '{image_file}'을 찾을 수 없습니다.")
         return None
 
 # ****************** 이미지 데이터 사전 처리 ******************
@@ -378,9 +378,6 @@ if "is_reco_fallback" not in st.session_state: st.session_state.is_reco_fallback
 # JSON 파일에서 데이터 로드
 if "users_db" not in st.session_state: st.session_state.users_db = load_user_data()
 
-# 현재 탭 상태 저장 변수
-if "current_tab" not in st.session_state: st.session_state.current_tab = "🤖 AI 메뉴 추천"
-
 # ---------------- 로그인 페이지 ----------------
 def show_login_page():
     # 로그인 페이지에만 배경 이미지 적용
@@ -427,7 +424,6 @@ def show_login_page():
                             "stamps": user_data["stamps"],
                             "orders": user_data["orders"]
                         }
-                        st.session_state.current_tab = "🤖 AI 메뉴 추천" 
                         st.success(f"{st.session_state.user['name']}님, 로그인되었습니다.")
                         st.rerun()
                     else:
@@ -450,7 +446,6 @@ def show_login_page():
                         "stamps": 0,
                         "orders": []
                     }
-                    st.session_state.current_tab = "🤖 AI 메뉴 추천" 
                     st.success(f"회원가입이 완료되었으며, **10% 할인 쿠폰 1개**가 지급되었습니다!")
                     st.balloons()
                     
@@ -547,17 +542,15 @@ def process_order_completion(phone_suffix, order_id, df_cart, total, final_total
     # 데이터 저장
     save_user_data(st.session_state.users_db)
     
-    # 5. 장바구니 비우고 현재 탭 유지
+    # 5. 장바구니 비우고 새로고침
     st.session_state.cart = []
-    # st.rerun() # 주문 완료 후 st.rerun()은 show_main_app을 다시 호출하게 됩니다. 탭 상태가 유지되도록 합니다.
-
+    st.rerun()
 
 # ---------------- 메인 앱 페이지 ----------------
 def show_main_app():
     set_custom_style(is_login=False) 
     st.title("🥐 AI 베이커리 추천·주문")
 
-    # 상단 정보 (사용자, 쿠폰, 로그아웃)
     c_user, c_coupon, c_logout = st.columns([4, 4, 2])
     with c_user:
         st.success(f"**{st.session_state.user.get('name', '고객')}**님, 환영합니다!")
@@ -573,53 +566,33 @@ def show_main_app():
             st.session_state.reco_results = []
             st.session_state.is_reco_fallback = False
             st.session_state.users_db = load_user_data()
-            st.session_state.current_tab = "🤖 AI 메뉴 추천" 
             st.success("로그아웃되었습니다.")
             st.rerun()
 
     st.markdown("---")
     
-    # 주문 시스템 바로가기 버튼 (클릭 시 장바구니로 바로 이동)
-    # NOTE: 클릭 시 세션 상태만 변경하고, 탭 렌더링에 반영되도록 st.rerun()은 호출하지 않습니다.
-    if st.button("🛒 주문 및 장바구니 바로 가기", type="primary", use_container_width=True):
-        st.session_state.current_tab = "🛍️ 장바구니"
-        # st.rerun() # rerune()을 제거하여 안정성 확보 (탭 컴포넌트 오류 방지)
-        
-    st.markdown("---")
+    # ****************** 오늘의 추천 메뉴 및 이벤트 ******************
+    st.subheader("📢 오늘의 혜택 & 추천 메뉴")
+    tab_event, tab_reco_jam, tab_reco_salt = st.tabs(["🎁 이벤트", "🥪 오늘의 추천: 잠봉 뵈르", "☕ 오늘의 추천: 아메리카노 & 소금빵"])
     
-    # ---------------- 탭 (핵심 주문 시스템) ----------------
-    tab_titles = ["🤖 AI 메뉴 추천", "📋 메뉴판", "🛍️ 장바구니", "❤️ 스탬프 & 내역"]
+    with tab_event:
+        st.image("event1.jpg", caption="앱 사용 인증샷으로 쿠키도 받고 디저트 세트도 받으세요!", use_column_width=True)
     
-    # --- 오류 해결 1: default_index의 안정적인 설정 ---
-    # current_tab이 tab_titles에 없으면 기본값 0 (첫 번째 탭)
-    default_index = tab_titles.index(st.session_state.current_tab) if st.session_state.current_tab in tab_titles else 0 
-
-    # 탭에 명시적인 key를 부여하여 안정성 확보 (오류 해결 1)
-    tab_reco, tab_menu, tab_cart, tab_history = st.tabs(tab_titles, default_index=default_index, key="main_order_tabs")
-
-    # 탭 클릭 시 상태 업데이트는 탭 블록 내부로 옮겨서 안정성 확보
-
-    # ****************** 포스터/이벤트 섹션은 닫힌 확장 영역으로 이동 (간소화) ******************
-    with st.expander("📢 이벤트 및 오늘의 추천 메뉴 보기 (클릭)", expanded=False):
-        st.subheader("오늘의 혜택 & 추천 메뉴")
-        
-        tab_event, tab_reco_jam, tab_reco_salt = st.tabs(["🎁 이벤트", "🥪 오늘의 추천: 잠봉 뵈르", "☕ 오늘의 추천: 아메리카노 & 소금빵"], key="event_tabs")
-        
-        with tab_event:
-            st.image("event1.jpg", caption="앱 사용 인증샷으로 쿠키도 받고 디저트 세트도 받으세요!", use_column_width=True)
-        
-        with tab_reco_jam:
-            st.image("poster2.jpg", caption="오늘의 든든한 점심 추천! 바삭한 바게트에 햄과 버터의 환상적인 조화!", use_column_width=True)
-        
-        with tab_reco_salt:
-            st.image("poster1.jpg", caption="국민 조합! 짭짤 고소한 소금빵과 시원한 아메리카노 세트!", use_column_width=True)
-            
+    with tab_reco_jam:
+        st.image("poster2.jpg", caption="오늘의 든든한 점심 추천! 바삭한 바게트에 햄과 버터의 환상적인 조화!", use_column_width=True)
+    
+    with tab_reco_salt:
+        st.image("poster1.jpg", caption="국민 조합! 짭짤 고소한 소금빵과 시원한 아메리카노 세트!", use_column_width=True)
+    
     st.markdown("---")
     # *************************************************************************
 
+
+    # ---------------- 탭 ----------------
+    tab_reco, tab_menu, tab_cart, tab_history = st.tabs(["🤖 AI 메뉴 추천", "📋 메뉴판", "🛍️ 장바구니", "❤️ 스탬프 & 내역"])
+
     # ===== 추천 로직 =====
     with tab_reco:
-        st.session_state.current_tab = "🤖 AI 메뉴 추천" # 탭 선택 시 상태 업데이트
         st.header("AI 맞춤형 메뉴 추천")
 
         st.subheader("1. 추천 조건 설정")
@@ -729,7 +702,6 @@ def show_main_app():
 
     # ===== 메뉴판 (주문 가능) =====
     with tab_menu:
-        st.session_state.current_tab = "📋 메뉴판" # 탭 선택 시 상태 업데이트
         st.header("📋 전체 메뉴판")
 
         st.subheader("🍞 베이커리 메뉴")
@@ -763,7 +735,6 @@ def show_main_app():
 
     # ===== 장바구니 (쿠폰 로직 수정) =====
     with tab_cart:
-        st.session_state.current_tab = "🛍️ 장바구니" # 탭 선택 시 상태 업데이트
         st.header("🛍️ 장바구니")
 
         if not st.session_state.cart:
@@ -881,14 +852,12 @@ def show_main_app():
                         phone_suffix, oid, df_cart, total, final_total, 
                         discount_type, discount_amount 
                     )
-                    st.rerun() # 주문 완료 후 상태를 초기화하고 리렌더링
                 else:
                     st.error(f"주문 알림 이메일 전송에 실패했습니다: {err}. 관리자에게 문의해주세요.")
 
 
-    # ===== 스탬프 & 주문 내역 (KeyError 수정됨) =====
+    # ===== 스탬프 & 주문 내역 (금액 쿠폰/10% 쿠폰 분리) =====
     with tab_history:
-        st.session_state.current_tab = "❤️ 스탬프 & 내역" # 탭 선택 시 상태 업데이트
         st.header("❤️ 스탬프 & 주문 내역")
         
         # --- 스탬프 현황 ---
@@ -920,17 +889,13 @@ def show_main_app():
             st.info("아직 주문 내역이 없습니다. 지금 첫 주문을 완료하고 스탬프를 적립하세요!")
         else:
             for order in orders:
-                # Key Error 방지: .get()을 사용하여 키가 없을 경우 기본값을 사용
-                discount_amount = order.get('discount_amount', 0)
-                discount_type = order.get('discount_type', '없음')
-                
-                discount_info = f"할인: - {money(discount_amount)} ({discount_type if discount_type else '없음'})"
+                discount_info = f"할인: - {money(order['discount_amount'])} ({order['discount_type'] if order['discount_type'] else '없음'})"
                 
                 with st.expander(f"**[{order['date'].split(' ')[0]}]** 주문번호 #{order['id']} | 최종 결제: **{money(order['final_total'])}**", expanded=False):
                     st.markdown(f"**주문 시간:** {order['date']}")
                     st.markdown(f"**총 금액:** {money(order['total'])}")
                     st.markdown(f"**{discount_info}**")
-                    st.markdown(f"**적립 스탬프:** {order.get('stamps_earned', 1)}개")
+                    st.markdown(f"**적립 스탬프:** {order['stamps_earned']}개")
                     st.markdown("---")
                     st.markdown("**주문 상품 목록**")
                     for item in order['items']:
