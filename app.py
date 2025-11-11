@@ -346,10 +346,10 @@ def show_login_page():
     c_left, c_center, c_right = st.columns([1, 2, 1])
     with c_center:
         st.markdown(f"**<h1 style='text-align: center; margin-top: 15vh;'>🥐 {SHOP_NAME}</h1>**", unsafe_allow_html=True)
-        st.header("휴대폰 번호 뒷자리로 로그인/회원가입(비밀번호가 기억이 안 나는 고객님은 사장님께 문의해주세요!)")
+        st.header("휴대폰 번호 뒷자리로 로그인/회원가입")
         with st.form("login_form"):
             phone_suffix = st.text_input("휴대폰 번호 뒷 4자리", max_chars=4, placeholder="0000")
-            password = st.text_input("비밀번호 (숫자 6자리)", type="password", max_chars=6, placeholder="******")
+            password = st.text_input("비밀번호 (숫자 6자리, 비밀번호가 기억이 안 나는 고객님은 사장님께 문의해주세요)", type="password", max_chars=6, placeholder="******")
             submitted = st.form_submit_button("로그인 / 가입", type="primary", use_container_width=True)
             if submitted:
                 phone_suffix = phone_suffix.strip()
