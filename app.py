@@ -378,9 +378,8 @@ if "is_reco_fallback" not in st.session_state: st.session_state.is_reco_fallback
 # JSON 파일에서 데이터 로드
 if "users_db" not in st.session_state: st.session_state.users_db = load_user_data()
 
-# -------------------- 추가된 부분: 현재 탭 상태 저장 --------------------
+# 현재 탭 상태 저장 변수
 if "current_tab" not in st.session_state: st.session_state.current_tab = "🤖 AI 메뉴 추천"
-# ------------------------------------------------------------------------
 
 # ---------------- 로그인 페이지 ----------------
 def show_login_page():
@@ -428,7 +427,7 @@ def show_login_page():
                             "stamps": user_data["stamps"],
                             "orders": user_data["orders"]
                         }
-                        st.session_state.current_tab = "🤖 AI 메뉴 추천" # 로그인 성공 시 초기 탭 설정
+                        st.session_state.current_tab = "🤖 AI 메뉴 추천" 
                         st.success(f"{st.session_state.user['name']}님, 로그인되었습니다.")
                         st.rerun()
                     else:
@@ -451,7 +450,7 @@ def show_login_page():
                         "stamps": 0,
                         "orders": []
                     }
-                    st.session_state.current_tab = "🤖 AI 메뉴 추천" # 가입 성공 시 초기 탭 설정
+                    st.session_state.current_tab = "🤖 AI 메뉴 추천" 
                     st.success(f"회원가입이 완료되었으며, **10% 할인 쿠폰 1개**가 지급되었습니다!")
                     st.balloons()
                     
@@ -557,6 +556,7 @@ def show_main_app():
     set_custom_style(is_login=False) 
     st.title("🥐 AI 베이커리 추천·주문")
 
+    # 상단 정보 (사용자, 쿠폰, 로그아웃)
     c_user, c_coupon, c_logout = st.columns([4, 4, 2])
     with c_user:
         st.success(f"**{st.session_state.user.get('name', '고객')}**님, 환영합니다!")
@@ -572,54 +572,53 @@ def show_main_app():
             st.session_state.reco_results = []
             st.session_state.is_reco_fallback = False
             st.session_state.users_db = load_user_data()
-            st.session_state.current_tab = "🤖 AI 메뉴 추천" # 로그아웃 시 초기 탭으로
+            st.session_state.current_tab = "🤖 AI 메뉴 추천" 
             st.success("로그아웃되었습니다.")
             st.rerun()
 
     st.markdown("---")
     
-    # -------------------- 추가된 부분: 주문 바로가기 버튼 --------------------
+    # 주문 시스템 바로가기 버튼 (클릭 시 장바구니로 바로 이동)
     if st.button("🛒 주문 및 장바구니 바로 가기", type="primary", use_container_width=True):
         st.session_state.current_tab = "🛍️ 장바구니"
         st.rerun() 
     
     st.markdown("---")
-    # ------------------------------------------------------------------------
-
-    # ****************** 오늘의 추천 메뉴 및 이벤트 ******************
-    st.subheader("📢 오늘의 혜택 & 추천 메뉴")
-    tab_event, tab_reco_jam, tab_reco_salt = st.tabs(["🎁 이벤트", "🥪 오늘의 추천: 잠봉 뵈르", "☕ 오늘의 추천: 아메리카노 & 소금빵"])
     
-    with tab_event:
-        st.image("event1.jpg", caption="앱 사용 인증샷으로 쿠키도 받고 디저트 세트도 받으세요!", use_column_width=True)
-    
-    with tab_reco_jam:
-        st.image("poster2.jpg", caption="오늘의 든든한 점심 추천! 바삭한 바게트에 햄과 버터의 환상적인 조화!", use_column_width=True)
-    
-    with tab_reco_salt:
-        st.image("poster1.jpg", caption="국민 조합! 짭짤 고소한 소금빵과 시원한 아메리카노 세트!", use_column_width=True)
-    
-    st.markdown("---")
-    # *************************************************************************
-
-
-    # ---------------- 탭 ----------------
+    # ---------------- 탭 (핵심 주문 시스템) ----------------
     tab_titles = ["🤖 AI 메뉴 추천", "📋 메뉴판", "🛍️ 장바구니", "❤️ 스탬프 & 내역"]
     
-    # 현재 세션 상태의 탭 이름을 찾아 인덱스를 설정
     try:
         default_index = tab_titles.index(st.session_state.current_tab)
     except ValueError:
         default_index = 0 
 
+    # 탭을 바로 노출하여 사용자가 스크롤 없이 주문 시스템에 접근
     tab_reco, tab_menu, tab_cart, tab_history = st.tabs(tab_titles, default_index=default_index)
 
-    # 현재 탭 상태 업데이트 (다른 탭으로 이동 시 세션 상태에 저장)
+    # 탭 클릭 시 상태 업데이트
     if tab_reco: st.session_state.current_tab = "🤖 AI 메뉴 추천"
     if tab_menu: st.session_state.current_tab = "📋 메뉴판"
     if tab_cart: st.session_state.current_tab = "🛍️ 장바구니"
     if tab_history: st.session_state.current_tab = "❤️ 스탬프 & 내역"
 
+
+    # ****************** 포스터/이벤트 섹션은 닫힌 확장 영역으로 이동 (간소화) ******************
+    with st.expander("📢 이벤트 및 오늘의 추천 메뉴 보기 (클릭)", expanded=False):
+        st.subheader("오늘의 혜택 & 추천 메뉴")
+        tab_event, tab_reco_jam, tab_reco_salt = st.tabs(["🎁 이벤트", "🥪 오늘의 추천: 잠봉 뵈르", "☕ 오늘의 추천: 아메리카노 & 소금빵"])
+        
+        with tab_event:
+            st.image("event1.jpg", caption="앱 사용 인증샷으로 쿠키도 받고 디저트 세트도 받으세요!", use_column_width=True)
+        
+        with tab_reco_jam:
+            st.image("poster2.jpg", caption="오늘의 든든한 점심 추천! 바삭한 바게트에 햄과 버터의 환상적인 조화!", use_column_width=True)
+        
+        with tab_reco_salt:
+            st.image("poster1.jpg", caption="국민 조합! 짭짤 고소한 소금빵과 시원한 아메리카노 세트!", use_column_width=True)
+            
+    st.markdown("---")
+    # *************************************************************************
 
     # ===== 추천 로직 =====
     with tab_reco:
