@@ -54,11 +54,12 @@ def get_base64_image(image_file):
 
             return f"data:{mime_type};base64,{base64.b64encode(f.read()).decode()}"
     except FileNotFoundError:
-        print(f"경고: 배경 이미지 파일 '{image_file}'을 찾을 수 없습니다.")
+        # print(f"경고: 배경 이미지 파일 '{image_file}'을 찾을 수 없습니다.") # 로그 제거 (streamlit 자체 로그 방지)
         return None
 
 # ****************** 이미지 데이터 사전 처리 ******************
 # 스크립트 실행 시 이미지 파일을 미리 Base64로 인코딩합니다.
+# NOTE: None 값은 리스트 컴프리헨션에서 필터링됩니다. (오류 해결 2번)
 ENCODED_LOGIN_IMAGES = [
     data for file_name in LOGIN_IMAGES_FILES 
     if (data := get_base64_image(file_name)) is not None
@@ -161,6 +162,7 @@ def set_custom_style(is_login=False):
             text-shadow: 1px 1px 2px rgba(255, 255, 255, 0.5);
         }}
         """
+    # NOTE: num_images가 0일 경우 (이미지 파일을 못 찾은 경우) login_css는 빈 문자열이 되어 배경이 적용되지 않습니다.
 
     # 일반 앱 페이지의 CSS
     app_css = f"""
@@ -579,6 +581,7 @@ def show_main_app():
     st.markdown("---")
     
     # 주문 시스템 바로가기 버튼 (클릭 시 장바구니로 바로 이동)
+    # 이 버튼은 주문 시스템 탭 위에 남아있습니다.
     if st.button("🛒 주문 및 장바구니 바로 가기", type="primary", use_container_width=True):
         st.session_state.current_tab = "🛍️ 장바구니"
         st.rerun() 
@@ -588,24 +591,23 @@ def show_main_app():
     # ---------------- 탭 (핵심 주문 시스템) ----------------
     tab_titles = ["🤖 AI 메뉴 추천", "📋 메뉴판", "🛍️ 장바구니", "❤️ 스탬프 & 내역"]
     
+    # --- 오류 해결 1: default_index의 안정적인 설정 ---
     try:
         default_index = tab_titles.index(st.session_state.current_tab)
     except ValueError:
-        default_index = 0 
+        default_index = 0 # 유효하지 않은 값이면 첫 번째 탭으로 설정 (안정성 확보)
 
     # 탭을 바로 노출하여 사용자가 스크롤 없이 주문 시스템에 접근
     tab_reco, tab_menu, tab_cart, tab_history = st.tabs(tab_titles, default_index=default_index)
 
-    # 탭 클릭 시 상태 업데이트
-    if tab_reco: st.session_state.current_tab = "🤖 AI 메뉴 추천"
-    if tab_menu: st.session_state.current_tab = "📋 메뉴판"
-    if tab_cart: st.session_state.current_tab = "🛍️ 장바구니"
-    if tab_history: st.session_state.current_tab = "❤️ 스탬프 & 내역"
-
+    # 탭 클릭 시 상태 업데이트는 탭 블록 내부로 옮겨서 안정성 확보
+    # 이전 코드에서는 탭 객체 자체가 truthy 값을 가지므로 if문으로 체크
 
     # ****************** 포스터/이벤트 섹션은 닫힌 확장 영역으로 이동 (간소화) ******************
     with st.expander("📢 이벤트 및 오늘의 추천 메뉴 보기 (클릭)", expanded=False):
         st.subheader("오늘의 혜택 & 추천 메뉴")
+        
+        # NOTE: 이 곳에서는 세션 상태 업데이트를 하지 않습니다.
         tab_event, tab_reco_jam, tab_reco_salt = st.tabs(["🎁 이벤트", "🥪 오늘의 추천: 잠봉 뵈르", "☕ 오늘의 추천: 아메리카노 & 소금빵"])
         
         with tab_event:
@@ -622,6 +624,7 @@ def show_main_app():
 
     # ===== 추천 로직 =====
     with tab_reco:
+        st.session_state.current_tab = "🤖 AI 메뉴 추천" # 탭 선택 시 상태 업데이트
         st.header("AI 맞춤형 메뉴 추천")
 
         st.subheader("1. 추천 조건 설정")
@@ -731,6 +734,7 @@ def show_main_app():
 
     # ===== 메뉴판 (주문 가능) =====
     with tab_menu:
+        st.session_state.current_tab = "📋 메뉴판" # 탭 선택 시 상태 업데이트
         st.header("📋 전체 메뉴판")
 
         st.subheader("🍞 베이커리 메뉴")
@@ -764,6 +768,7 @@ def show_main_app():
 
     # ===== 장바구니 (쿠폰 로직 수정) =====
     with tab_cart:
+        st.session_state.current_tab = "🛍️ 장바구니" # 탭 선택 시 상태 업데이트
         st.header("🛍️ 장바구니")
 
         if not st.session_state.cart:
@@ -887,6 +892,7 @@ def show_main_app():
 
     # ===== 스탬프 & 주문 내역 (KeyError 수정됨) =====
     with tab_history:
+        st.session_state.current_tab = "❤️ 스탬프 & 내역" # 탭 선택 시 상태 업데이트
         st.header("❤️ 스탬프 & 주문 내역")
         
         # --- 스탬프 현황 ---
